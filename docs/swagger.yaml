@@ -1,0 +1,388 @@
+basePath: /
+definitions:
+  internal_handlers.APIKeyDoc:
+    properties:
+      created_at:
+        example: "2026-04-01T12:00:00Z"
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      is_active:
+        example: true
+        type: boolean
+      key_prefix:
+        example: edgemask_live_a1b2c3d4
+        type: string
+      name:
+        example: Production Key
+        type: string
+      user_id:
+        example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        type: string
+    type: object
+  internal_handlers.AggregateStatsResp:
+    properties:
+      total_pii_redacted:
+        example: 3420
+        type: integer
+      total_requests:
+        example: 12450
+        type: integer
+      total_tokens_used:
+        example: 1250000
+        type: integer
+    type: object
+  internal_handlers.CreateKeyReq:
+    properties:
+      name:
+        example: Production Key
+        type: string
+    type: object
+  internal_handlers.CreateKeyResp:
+    properties:
+      key:
+        example: edgemask_live_a1b2c3d4e5f6...
+        type: string
+      message:
+        example: Save this key securely. It will NOT be shown again.
+        type: string
+    type: object
+  internal_handlers.ErrorResponse:
+    properties:
+      error:
+        example: something went wrong
+        type: string
+    type: object
+  internal_handlers.ListKeysResponse:
+    properties:
+      keys:
+        items:
+          $ref: '#/definitions/internal_handlers.APIKeyDoc'
+        type: array
+    type: object
+  internal_handlers.MsgDoc:
+    properties:
+      content:
+        example: Hello, how are you?
+        type: string
+      role:
+        example: user
+        type: string
+    type: object
+  internal_handlers.ProxyReq:
+    properties:
+      messages:
+        items:
+          $ref: '#/definitions/internal_handlers.MsgDoc'
+        type: array
+      model:
+        example: gpt-4o
+        type: string
+      stream:
+        example: true
+        type: boolean
+    type: object
+  internal_handlers.SaveProviderKeyReq:
+    properties:
+      api_key:
+        example: sk-proj-abc123...
+        type: string
+      provider:
+        enum:
+        - openai
+        - anthropic
+        - gemini
+        example: openai
+        type: string
+    type: object
+  internal_handlers.SaveProviderKeyResp:
+    properties:
+      hint:
+        example: sk-p...c123
+        type: string
+      message:
+        example: provider key saved successfully
+        type: string
+      provider:
+        example: openai
+        type: string
+    type: object
+  internal_handlers.UsageChartResp:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/internal_handlers.UsagePointDoc'
+        type: array
+      days:
+        example: 7
+        type: integer
+      interval:
+        example: day
+        type: string
+    type: object
+  internal_handlers.UsagePointDoc:
+    properties:
+      period:
+        example: 2026-04-01T00:00
+        type: string
+      pii_redacted:
+        example: 42
+        type: integer
+      requests:
+        example: 150
+        type: integer
+      tokens_used:
+        example: 25000
+        type: integer
+    type: object
+host: localhost:3000
+info:
+  contact:
+    email: support@edgemask.io
+    name: EdgeMask Support
+    url: https://edgemask.io/support
+  description: High-Performance B2B AI Proxy with PII Redaction. EdgeMask intercepts
+    LLM API requests, scrubs PII data, and forwards them to OpenAI, Anthropic, or
+    Gemini using customer-provided API keys (BYOK model).
+  license:
+    name: Commercial
+    url: https://edgemask.io/license
+  termsOfService: https://edgemask.io/terms
+  title: EdgeMask API
+  version: "1.0"
+paths:
+  /api/keys:
+    get:
+      description: Returns all EdgeMask API keys for the authenticated user. Only
+        prefixes are shown, never full keys or hashes.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.ListKeysResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+      security:
+      - SupabaseJWT: []
+      summary: List all API keys
+      tags:
+      - Key Management
+    post:
+      consumes:
+      - application/json
+      description: Creates a new edgemask_live_ API key. The raw key is returned ONLY
+        ONCE — save it securely.
+      parameters:
+      - description: Key creation request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.CreateKeyReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_handlers.CreateKeyResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+      security:
+      - SupabaseJWT: []
+      summary: Generate a new API key
+      tags:
+      - Key Management
+  /api/providers:
+    post:
+      consumes:
+      - application/json
+      description: Encrypts and stores the customer's LLM provider key (OpenAI, Anthropic,
+        or Gemini). Uses AES-256-GCM encryption at rest.
+      parameters:
+      - description: Provider key to save
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.SaveProviderKeyReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.SaveProviderKeyResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+      security:
+      - SupabaseJWT: []
+      summary: Save or update a provider API key
+      tags:
+      - Provider Keys
+  /api/stats:
+    get:
+      description: Returns total request count, total PII items redacted, and total
+        tokens processed for the authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.AggregateStatsResp'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+      security:
+      - SupabaseJWT: []
+      summary: Get aggregate statistics
+      tags:
+      - Analytics
+  /api/usage-chart:
+    get:
+      description: Returns time-series usage data grouped by day or hour, for building
+        dashboard charts.
+      parameters:
+      - default: day
+        description: Grouping interval
+        enum:
+        - day
+        - hour
+        in: query
+        name: interval
+        type: string
+      - default: 7
+        description: Number of days to look back (1-90)
+        in: query
+        maximum: 90
+        minimum: 1
+        name: days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.UsageChartResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+      security:
+      - SupabaseJWT: []
+      summary: Get usage chart data
+      tags:
+      - Analytics
+  /v1/proxy/{provider}:
+    post:
+      consumes:
+      - application/json
+      description: Scrubs PII from the request body, then forwards it to the selected
+        LLM provider (openai, anthropic, gemini) using the customer's own API key.
+        Supports streaming (SSE) responses.
+      parameters:
+      - description: LLM provider
+        enum:
+        - openai
+        - anthropic
+        - gemini
+        in: path
+        name: provider
+        required: true
+        type: string
+      - description: OpenAI-compatible chat completion request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.ProxyReq'
+      produces:
+      - application/json
+      - text/event-stream
+      responses:
+        "200":
+          description: Proxied response (may be SSE stream)
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+      security:
+      - EdgeMaskAPIKey: []
+      summary: Proxy request to LLM provider
+      tags:
+      - Proxy
+securityDefinitions:
+  EdgeMaskAPIKey:
+    description: 'EdgeMask API Key. Format: `Bearer edgemask_live_...`'
+    in: header
+    name: Authorization
+    type: apiKey
+  SupabaseJWT:
+    description: 'Supabase JWT token for dashboard access. Format: `Bearer <jwt_token>`'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
+tags:
+- description: AI Proxy endpoints — forward requests to LLM providers with PII redaction
+  name: Proxy
+- description: Manage EdgeMask API keys (edgemask_live_...)
+  name: Key Management
+- description: Manage customer-owned LLM provider API keys (BYOK)
+  name: Provider Keys
+- description: Usage statistics and time-series analytics for the dashboard
+  name: Analytics
