@@ -1,0 +1,17 @@
+$kind: http-request
+name: Save Provider Key
+method: POST
+url: '{{baseUrl}}/api/providers'
+description: 'Encrypts and stores the customer LLM provider key (OpenAI, Anthropic, or Gemini). Uses AES-256-GCM encryption at rest.'
+headers:
+  - key: Authorization
+    value: 'Bearer {{supabaseJwt}}'
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "provider": "openai",
+      "api_key": "sk-..."
+    }

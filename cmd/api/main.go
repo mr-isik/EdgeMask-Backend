@@ -6,10 +6,15 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/swagger"
+	goredis "github.com/redis/go-redis/v9"
+
 	"github.com/mr-isik/edgemask-backend/config"
 	_ "github.com/mr-isik/edgemask-backend/docs"
 	"github.com/mr-isik/edgemask-backend/internal/handlers"
+	"github.com/mr-isik/edgemask-backend/internal/infrastructure/database"
 	"github.com/mr-isik/edgemask-backend/internal/infrastructure/providers"
+	pgRepo "github.com/mr-isik/edgemask-backend/internal/repository/postgres"
+	redisRepo "github.com/mr-isik/edgemask-backend/internal/repository/redis"
 	"github.com/mr-isik/edgemask-backend/internal/services"
 	"github.com/mr-isik/edgemask-backend/pkg/logger"
 )
@@ -55,6 +60,52 @@ func main() {
 	cfg := config.LoadConfig()
 	logger.Info("EdgeMask starting in ", cfg.AppEnv, " mode")
 
+	// ─── Database (Supabase PostgreSQL) ────────────────────────
+	db, err := database.Connect(cfg.DatabaseURL)
+	if err != nil {
+		logger.Error("Failed to connect to database: ", err)
+		panic(err)
+	}
+	defer db.Close()
+
+	// ─── Run Migrations ─────────────────────────────────────────
+	if err := database.RunMigrations(cfg.DatabaseURL, "./migrations"); err != nil {
+		logger.Error("Failed to run migrations: ", err)
+		panic(err)
+	}
+
+	// ─── Redis ─────────────────────────────────────────────────
+	redisClient := goredis.NewClient(&goredis.Options{
+		Addr:     cfg.RedisURL,
+		Password: cfg.RedisPassword,
+		DB:       0,
+	})
+	defer redisClient.Close()
+
+	// ─── Repositories ──────────────────────────────────────────
+	keyRepo := pgRepo.NewKeyRepository(db)
+	providerKeyRepo := pgRepo.NewProviderKeyRepository(db)
+	analyticsRepo := pgRepo.NewAnalyticsRepository(db)
+	keyCache := redisRepo.NewKeyCache(redisClient)
+
+	// ─── Services ──────────────────────────────────────────────
+	encSvc, err := services.NewEncryptionService(cfg.MasterKey)
+	if err != nil {
+		logger.Error("Failed to initialize encryption service: ", err)
+		panic(err)
+	}
+
+	scrubbingSvc := services.NewScrubbingService()
+	authSvc := services.NewAuthService(keyRepo, keyCache)
+
+	// ─── LLM Provider Adapters (stateless, BYOK) ──────────────
+	openai := providers.NewOpenAIAdapter(cfg.OpenAIBaseURL)
+	anthropic := providers.NewAnthropicAdapter(cfg.AnthropicBaseURL)
+	gemini := providers.NewGeminiAdapter(cfg.GeminiBaseURL)
+
+	proxySvc := services.NewProxyService(scrubbingSvc, encSvc, providerKeyRepo, openai, anthropic, gemini)
+
+	// ─── Fiber App ─────────────────────────────────────────────
 	app := fiber.New(fiber.Config{
 		AppName:        "EdgeMask API",
 		ReadBufferSize: 8192,
@@ -80,43 +131,16 @@ func main() {
 		})
 	})
 
-	// ─── Encryption ────────────────────────────────────────────
-	encSvc, err := services.NewEncryptionService(cfg.MasterKey)
-	if err != nil {
-		logger.Error("Failed to initialize encryption service: ", err)
-		panic(err)
-	}
-	_ = encSvc
-
-	// ─── LLM Provider Adapters (stateless, BYOK) ──────────────
-	openai := providers.NewOpenAIAdapter(cfg.OpenAIBaseURL)
-	anthropic := providers.NewAnthropicAdapter(cfg.AnthropicBaseURL)
-	gemini := providers.NewGeminiAdapter(cfg.GeminiBaseURL)
-	_ = openai
-	_ = anthropic
-	_ = gemini
-
-	// ─── Services ──────────────────────────────────────────────
-	_ = services.NewScrubbingService()
-
 	// ─── Routes: /v1/* (Proxy — edgemask_live_ key auth) ──────
 	v1 := app.Group("/v1")
-	_ = v1
-	_ = handlers.AuthMiddleware
-	_ = handlers.NewProxyHandler
-	// TODO: Wire when DB is connected:
-	// v1.Use(handlers.AuthMiddleware(authSvc))
-	// handlers.NewProxyHandler(v1, proxySvc)
+	v1.Use(handlers.AuthMiddleware(authSvc))
+	handlers.NewProxyHandler(v1, proxySvc)
 
 	// ─── Routes: /api/* (Dashboard — Supabase JWT auth) ───────
 	api := app.Group("/api")
 	api.Use(handlers.DashboardMiddleware(cfg.SupabaseJWTSecret))
-	_ = api
-	_ = handlers.NewDashboardHandler
-	_ = handlers.NewAnalyticsHandler
-	// TODO: Wire when DB is connected:
-	// handlers.NewDashboardHandler(api, keyRepo, providerKeyRepo, encSvc)
-	// handlers.NewAnalyticsHandler(api, analyticsRepo)
+	handlers.NewDashboardHandler(api, keyRepo, providerKeyRepo, encSvc)
+	handlers.NewAnalyticsHandler(api, analyticsRepo)
 
 	// ─── Start Server ──────────────────────────────────────────
 	addr := fmt.Sprintf(":%s", cfg.Port)
@@ -127,3 +151,4 @@ func main() {
 		logger.Error("Failed to start server: ", err)
 	}
 }
+

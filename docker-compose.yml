@@ -1,0 +1,67 @@
+# ═══════════════════════════════════════════════════════════════
+#  EdgeMask Backend — Docker Compose (Development)
+#  Uses Supabase Cloud for PostgreSQL — only API + Redis here
+# ═══════════════════════════════════════════════════════════════
+#  Usage:
+#    docker compose up --build        → Build & start all services
+#    docker compose logs -f api       → Follow API logs
+#    docker compose down              → Stop all services
+# ═══════════════════════════════════════════════════════════════
+
+services:
+
+  # ─── EdgeMask API ────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: edgemask-api
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      APP_ENV: development
+      REDIS_URL: redis:6379
+      REDIS_PASSWORD: ""
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    networks:
+      - edgemask-net
+    restart: unless-stopped
+
+  # ─── Redis ──────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: edgemask-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    networks:
+      - edgemask-net
+    restart: unless-stopped
+
+# ─── Volumes ──────────────────────────────────────────────────
+volumes:
+  redis_data:
+    driver: local
+
+# ─── Networks ─────────────────────────────────────────────────
+networks:
+  edgemask-net:
+    driver: bridge

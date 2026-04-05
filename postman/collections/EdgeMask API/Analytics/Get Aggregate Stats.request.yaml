@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get Aggregate Stats
+method: GET
+url: '{{baseUrl}}/api/stats'
+description: 'Returns total request count, total PII items redacted, and total tokens processed for the authenticated user.'
+headers:
+  - key: Authorization
+    value: 'Bearer {{supabaseJwt}}'

@@ -1,0 +1,41 @@
+# ─── Version control ─────────────────────────────────────────
+.git
+.gitignore
+
+# ─── Build artifacts ─────────────────────────────────────────
+bin/
+tmp/
+
+# ─── Docker files (prevent recursive context) ───────────────
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# ─── Environment & secrets ───────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── IDE & editor ────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── Documentation ───────────────────────────────────────────
+README.md
+LICENSE
+
+# ─── OS files ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── Testing & CI ────────────────────────────────────────────
+coverage.out
+*.test
+
+# ─── Agent / AI directories ─────────────────────────────────
+.gemini/
+.agents/
+.agent/

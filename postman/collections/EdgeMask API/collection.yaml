@@ -1,0 +1,6 @@
+$kind: collection
+name: EdgeMask API
+description: 'High-Performance B2B AI Proxy with PII Redaction. EdgeMask intercepts LLM API requests, scrubs PII data, and forwards them to OpenAI, Anthropic, or Gemini using customer-provided API keys (BYOK model).'
+variables:
+  - key: baseUrl
+    value: 'http://localhost:3000'

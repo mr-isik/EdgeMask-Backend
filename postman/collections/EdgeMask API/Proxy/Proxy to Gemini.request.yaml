@@ -1,0 +1,23 @@
+$kind: http-request
+name: Proxy to Gemini
+method: POST
+url: '{{baseUrl}}/v1/proxy/gemini'
+description: 'Scrubs PII from the request body, then forwards it to Gemini using the customer own API key.'
+headers:
+  - key: Authorization
+    value: 'Bearer {{edgemaskApiKey}}'
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "model": "gemini-1.5-pro",
+      "stream": false,
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello, my SSN is 123-45-6789. Can you help me with a task?"
+        }
+      ]
+    }

@@ -1,0 +1,16 @@
+$kind: http-request
+name: Generate API Key
+method: POST
+url: '{{baseUrl}}/api/keys'
+description: 'Creates a new edgemask_live_ API key. The raw key is returned ONLY ONCE — save it securely.'
+headers:
+  - key: Authorization
+    value: 'Bearer {{supabaseJwt}}'
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Production Key"
+    }

@@ -1,0 +1,23 @@
+$kind: http-request
+name: Proxy to Anthropic
+method: POST
+url: '{{baseUrl}}/v1/proxy/anthropic'
+description: 'Scrubs PII from the request body, then forwards it to Anthropic using the customer own API key.'
+headers:
+  - key: Authorization
+    value: 'Bearer {{edgemaskApiKey}}'
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "model": "claude-3-5-sonnet-20241022",
+      "stream": false,
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello, my name is Jane Smith and my phone is 555-1234. Can you help me?"
+        }
+      ]
+    }

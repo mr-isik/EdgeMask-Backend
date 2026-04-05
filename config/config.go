@@ -13,7 +13,7 @@ type Config struct {
 	Port   string
 	AppEnv string
 
-	// PostgreSQL (Supabase)
+	// Database (Supabase PostgreSQL via Pooler)
 	DatabaseURL string
 
 	// Redis
@@ -24,8 +24,11 @@ type Config struct {
 	APIKeySecret string // Used for HMAC hashing of EdgeMask API keys
 	MasterKey    string // 32-byte key for AES-256-GCM encryption of customer provider keys
 
-	// Supabase (Dashboard Auth)
-	SupabaseJWTSecret string // Supabase JWT signing secret for dashboard auth
+	// Supabase
+	SupabaseURL            string // Supabase project URL (e.g. https://xxx.supabase.co)
+	SupabaseAnonKey        string // Client-side API key (anon role)
+	SupabaseServiceRoleKey string // Server-side API key (service_role) — NEVER expose in client code
+	SupabaseJWTSecret      string // JWT signing secret for verifying Supabase tokens
 
 	// LLM Provider Base URLs (keys come from customer DB, NOT env)
 	OpenAIBaseURL    string
@@ -48,7 +51,10 @@ func LoadConfig() *Config {
 		APIKeySecret:  getEnv("API_KEY_SECRET", ""),
 		MasterKey:     getEnv("MASTER_KEY", ""),
 
-		SupabaseJWTSecret: getEnv("SUPABASE_JWT_SECRET", ""),
+		SupabaseURL:            getEnv("SUPABASE_URL", ""),
+		SupabaseAnonKey:        getEnv("SUPABASE_ANON_KEY", ""),
+		SupabaseServiceRoleKey: getEnv("SUPABASE_SERVICE_ROLE_KEY", ""),
+		SupabaseJWTSecret:      getEnv("SUPABASE_JWT_SECRET", ""),
 
 		OpenAIBaseURL:    getEnv("OPENAI_BASE_URL", "https://api.openai.com"),
 		AnthropicBaseURL: getEnv("ANTHROPIC_BASE_URL", "https://api.anthropic.com"),

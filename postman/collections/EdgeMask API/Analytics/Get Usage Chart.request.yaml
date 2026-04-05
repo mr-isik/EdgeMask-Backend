@@ -1,0 +1,15 @@
+$kind: http-request
+name: Get Usage Chart
+method: GET
+url: '{{baseUrl}}/api/usage-chart'
+description: 'Returns time-series usage data grouped by day or hour, for building dashboard charts.'
+headers:
+  - key: Authorization
+    value: 'Bearer {{supabaseJwt}}'
+queryParams:
+  - key: interval
+    value: day
+    description: 'Grouping interval (day or hour)'
+  - key: days
+    value: '7'
+    description: 'Number of days to look back (1-90)'

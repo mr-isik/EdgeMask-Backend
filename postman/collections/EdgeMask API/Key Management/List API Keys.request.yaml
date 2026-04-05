@@ -1,0 +1,8 @@
+$kind: http-request
+name: List API Keys
+method: GET
+url: '{{baseUrl}}/api/keys'
+description: 'Returns all EdgeMask API keys for the authenticated user. Only prefixes are shown, never full keys or hashes.'
+headers:
+  - key: Authorization
+    value: 'Bearer {{supabaseJwt}}'

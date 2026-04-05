@@ -1,0 +1,14 @@
+name: EdgeMask Local
+values:
+  - key: baseUrl
+    value: 'http://localhost:3000'
+    enabled: true
+    type: default
+  - key: supabaseJwt
+    value: ''
+    enabled: true
+    type: default
+  - key: edgemaskApiKey
+    value: ''
+    enabled: true
+    type: default
