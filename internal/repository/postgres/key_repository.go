@@ -96,3 +96,28 @@ func (r *keyRepository) ListKeysByUserID(ctx context.Context, userID string) ([]
 
 	return keys, nil
 }
+
+// RevokeKey marks an API key as inactive.
+func (r *keyRepository) RevokeKey(ctx context.Context, userID string, keyID string) error {
+	const query = `
+		UPDATE api_keys
+		SET is_active = FALSE
+		WHERE id = $1 AND user_id = $2
+	`
+
+	res, err := r.db.ExecContext(ctx, query, keyID, userID)
+	if err != nil {
+		return fmt.Errorf("failed to revoke key: %w", err)
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return domain.ErrKeyNotFound
+	}
+
+	return nil
+}

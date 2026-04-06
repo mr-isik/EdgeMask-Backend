@@ -56,3 +56,27 @@ func (r *providerKeyRepository) SaveProviderKey(ctx context.Context, userID stri
 
 	return nil
 }
+
+// DeleteProviderKey hard deletes a customer's provider key.
+func (r *providerKeyRepository) DeleteProviderKey(ctx context.Context, userID string, provider domain.ProviderID) error {
+	const query = `
+		DELETE FROM customer_provider_keys
+		WHERE user_id = $1 AND provider = $2
+	`
+
+	res, err := r.db.ExecContext(ctx, query, userID, string(provider))
+	if err != nil {
+		return fmt.Errorf("failed to delete provider key: %w", err)
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return domain.ErrProviderKeyMissing
+	}
+
+	return nil
+}

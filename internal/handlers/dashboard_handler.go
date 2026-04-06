@@ -28,7 +28,10 @@ func NewDashboardHandler(
 
 	app.Get("/keys", h.ListKeys)
 	app.Post("/keys", h.CreateKey)
+	app.Patch("/keys/:id/revoke", h.RevokeKey)
+
 	app.Post("/providers", h.SaveProviderKey)
+	app.Delete("/providers/:provider", h.DeleteProviderKey)
 }
 
 // ListKeys godoc
@@ -179,4 +182,93 @@ func generateKeyHint(key string) string {
 		return "****"
 	}
 	return key[:4] + "..." + key[len(key)-4:]
+}
+
+// RevokeKey godoc
+// @Summary      Revoke an API key
+// @Description  Marks an EdgeMask API key as inactive. Subsequent proxy requests with this key will be rejected.
+// @Tags         Key Management
+// @Produce      json
+// @Param        id   path      string  true  "Key ID to revoke"
+// @Success      200  {object}  map[string]string
+// @Failure      401  {object}  ErrorResponse
+// @Failure      404  {object}  ErrorResponse
+// @Failure      500  {object}  ErrorResponse
+// @Security     SupabaseJWT
+// @Router       /api/keys/{id}/revoke [patch]
+func (h *DashboardHandler) RevokeKey(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	keyID := c.Params("id")
+
+	if keyID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "key ID is required",
+		})
+	}
+
+	if err := h.keyRepo.RevokeKey(c.Context(), userID, keyID); err != nil {
+		if err == domain.ErrKeyNotFound {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "key not found or already inactive",
+			})
+		}
+		logger.Error("Failed to revoke key: ", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to revoke key",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "api key revoked successfully",
+	})
+}
+
+// DeleteProviderKey godoc
+// @Summary      Delete a provider API key
+// @Description  Hard deletes a customer's LLM provider API key from EdgeMask.
+// @Tags         Provider Keys
+// @Produce      json
+// @Param        provider   path      string  true  "Provider ID to delete (openai, anthropic, gemini)"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  ErrorResponse
+// @Failure      401  {object}  ErrorResponse
+// @Failure      404  {object}  ErrorResponse
+// @Failure      500  {object}  ErrorResponse
+// @Security     SupabaseJWT
+// @Router       /api/providers/{provider} [delete]
+func (h *DashboardHandler) DeleteProviderKey(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	provider := c.Params("provider")
+
+	if provider == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "provider is required",
+		})
+	}
+
+	// Basic validation of provider name
+	switch domain.ProviderID(provider) {
+	case domain.ProviderOpenAI, domain.ProviderAnthropic, domain.ProviderGemini:
+	default:
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid provider. Must be: openai, anthropic, or gemini",
+		})
+	}
+
+	if err := h.providerRepo.DeleteProviderKey(c.Context(), userID, domain.ProviderID(provider)); err != nil {
+		if err == domain.ErrProviderKeyMissing {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "provider key not found",
+			})
+		}
+		logger.Error("Failed to delete provider key: ", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to delete provider key",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message":  "provider key deleted successfully",
+		"provider": provider,
+	})
 }

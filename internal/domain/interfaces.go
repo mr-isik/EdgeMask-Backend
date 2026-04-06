@@ -16,12 +16,14 @@ type KeyRepository interface {
 	GetKeyByHash(ctx context.Context, keyHash string) (*KeyLookupResult, error)
 	CreateKey(ctx context.Context, userID string, name string) (rawKey string, err error)
 	ListKeysByUserID(ctx context.Context, userID string) ([]APIKey, error)
+	RevokeKey(ctx context.Context, userID string, keyID string) error
 }
 
 // ProviderKeyRepository handles storage/retrieval of customer-owned LLM provider keys.
 type ProviderKeyRepository interface {
 	GetProviderKey(ctx context.Context, userID string, provider ProviderID) (*CustomerProviderKey, error)
 	SaveProviderKey(ctx context.Context, userID string, provider ProviderID, encryptedKey string, keyHint string) error
+	DeleteProviderKey(ctx context.Context, userID string, provider ProviderID) error
 }
 
 // AnalyticsRepository handles usage logging and aggregation.
