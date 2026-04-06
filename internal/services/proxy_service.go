@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,13 +11,20 @@ import (
 	"github.com/mr-isik/edgemask-backend/pkg/logger"
 )
 
+// chatMessage is the minimal struct needed to extract user-facing text fields
+// from an OpenAI-compatible messages array.
+type chatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
 // proxyService implements domain.ProxyService.
 // Orchestrates: fetch customer key → scrub PII → select provider → forward.
 type proxyService struct {
-	scrubber      domain.ScrubbingService
-	encryption    domain.EncryptionService
-	providerKeys  domain.ProviderKeyRepository
-	providers     map[domain.ProviderID]domain.LLMProvider
+	scrubber     domain.ScrubbingService
+	encryption   domain.EncryptionService
+	providerKeys domain.ProviderKeyRepository
+	providers    map[domain.ProviderID]domain.LLMProvider
 }
 
 // NewProxyService creates a new ProxyService with the given dependencies.
@@ -38,6 +46,58 @@ func NewProxyService(
 		providerKeys: providerKeys,
 		providers:    pm,
 	}
+}
+
+// scrubMessages performs surgical PII redaction on ONLY the messages[].content
+// fields of the raw JSON body. All other fields (model, temperature, etc.) are
+// preserved byte-for-byte via json.RawMessage.
+func (s *proxyService) scrubMessages(rawBody []byte) ([]byte, int, error) {
+	// Pass 1: Unmarshal top-level keys into a map to preserve unknown fields.
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(rawBody, &top); err != nil {
+		return nil, 0, fmt.Errorf("failed to parse request JSON: %w", err)
+	}
+
+	msgsRaw, ok := top["messages"]
+	if !ok {
+		// No messages array — nothing to scrub (e.g. embeddings request).
+		return rawBody, 0, nil
+	}
+
+	// Pass 2: Unmarshal only the messages array.
+	var msgs []chatMessage
+	if err := json.Unmarshal(msgsRaw, &msgs); err != nil {
+		return nil, 0, fmt.Errorf("failed to parse messages array: %w", err)
+	}
+
+	// Scrub only the content field of each message.
+	totalRedacted := 0
+	for i := range msgs {
+		scrubbed, count := s.scrubber.Redact(msgs[i].Content)
+		if count > 0 {
+			msgs[i].Content = scrubbed
+			totalRedacted += count
+		}
+	}
+
+	if totalRedacted == 0 {
+		// Nothing was redacted — return the original body untouched.
+		return rawBody, 0, nil
+	}
+
+	// Re-marshal the scrubbed messages and put them back.
+	scrubbedMsgs, err := json.Marshal(msgs)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to re-marshal scrubbed messages: %w", err)
+	}
+	top["messages"] = scrubbedMsgs
+
+	result, err := json.Marshal(top)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to re-marshal request body: %w", err)
+	}
+
+	return result, totalRedacted, nil
 }
 
 // Forward fetches the customer's decrypted provider key, scrubs PII from the
@@ -69,14 +129,18 @@ func (s *proxyService) Forward(
 		return nil, nil, http.StatusInternalServerError, fmt.Errorf("failed to decrypt provider key")
 	}
 
-	// 4. Scrub PII from the request body
-	scrubbedText, count := s.scrubber.Redact(string(rawBody))
+	// 4. Scrub PII from ONLY the messages[].content fields (surgical mutation)
+	scrubbedBody, count, scrubErr := s.scrubMessages(rawBody)
+	if scrubErr != nil {
+		logger.Error("Failed to scrub request body: ", scrubErr)
+		return nil, nil, http.StatusBadRequest, fmt.Errorf("failed to scrub request body: %w", scrubErr)
+	}
 	if count > 0 {
 		logger.Info(fmt.Sprintf("Redacted %d PII item(s) before forwarding to %s", count, providerID))
 	}
 
 	// 5. Forward to provider with the customer's key
-	body, respHeaders, statusCode, err := provider.Forward(ctx, []byte(scrubbedText), decryptedKey, headers)
+	body, respHeaders, statusCode, err := provider.Forward(ctx, scrubbedBody, decryptedKey, headers)
 	if err != nil {
 		logger.Error("Provider error [", string(providerID), "]: ", err)
 		if statusCode == 0 {

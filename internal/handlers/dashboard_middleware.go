@@ -1,18 +1,39 @@
 package handlers
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
+	"github.com/MicahParks/keyfunc/v3"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/mr-isik/edgemask-backend/pkg/logger"
 )
 
-// DashboardMiddleware validates Supabase JWTs for dashboard routes.
-// This is SEPARATE from AuthMiddleware — dashboard uses Supabase JWTs,
-// while proxy uses edgemask_live_ API keys. They must NOT be mixed.
-func DashboardMiddleware(jwtSecret string) fiber.Handler {
+// DashboardMiddleware authenticates requests using Supabase Auth JWTs.
+// Supabase signs user tokens with ES256 (ECDSA). The public key is fetched
+// from the project's JWKS endpoint and cached/refreshed automatically.
+func DashboardMiddleware(supabaseURL string) fiber.Handler {
+	// Build the JWKS endpoint URL
+	jwksURL := fmt.Sprintf("%s/auth/v1/.well-known/jwks.json", strings.TrimRight(supabaseURL, "/"))
+	logger.Info("Fetching JWKS from: ", jwksURL)
+
+	// Create a JWKS keyfunc that auto-refreshes in the background.
+	// keyfunc.NewDefault fetches the JWKS from the URL and keeps it fresh.
+	k, err := keyfunc.NewDefault([]string{jwksURL})
+	if err != nil {
+		logger.Error("Failed to initialize JWKS keyfunc: ", err)
+		// Return a middleware that always fails — server can't validate tokens
+		return func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "authentication service unavailable",
+			})
+		}
+	}
+
+	logger.Info("JWKS keyfunc initialized successfully")
+
 	return func(c *fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
@@ -37,13 +58,8 @@ func DashboardMiddleware(jwtSecret string) fiber.Handler {
 			})
 		}
 
-		// Parse and validate the Supabase JWT
-		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fiber.NewError(fiber.StatusUnauthorized, "unexpected signing method")
-			}
-			return []byte(jwtSecret), nil
-		})
+		// Parse and validate the Supabase JWT using JWKS
+		token, err := jwt.Parse(tokenStr, k.KeyfuncCtx(c.Context()))
 
 		if err != nil || !token.Valid {
 			logger.Error("JWT validation failed: ", err)

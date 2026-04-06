@@ -138,7 +138,7 @@ func main() {
 
 	// ─── Routes: /api/* (Dashboard — Supabase JWT auth) ───────
 	api := app.Group("/api")
-	api.Use(handlers.DashboardMiddleware(cfg.SupabaseJWTSecret))
+	api.Use(handlers.DashboardMiddleware(cfg.SupabaseURL))
 	handlers.NewDashboardHandler(api, keyRepo, providerKeyRepo, encSvc)
 	handlers.NewAnalyticsHandler(api, analyticsRepo)
 
