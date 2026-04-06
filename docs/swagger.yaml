@@ -61,6 +61,50 @@ definitions:
           $ref: '#/definitions/internal_handlers.APIKeyDoc'
         type: array
     type: object
+  internal_handlers.LogEntryDoc:
+    properties:
+      api_key_prefix:
+        example: edgemask_live_f4a2
+        type: string
+      latency_ms:
+        example: 8
+        type: integer
+      log_id:
+        example: req_8f7d6a...
+        type: string
+      model_used:
+        example: gpt-4-turbo
+        type: string
+      pii_detected:
+        example: true
+        type: boolean
+      scrubbed_items:
+        example:
+        - CREDIT_CARD
+        - EMAIL
+        items:
+          type: string
+        type: array
+      timestamp:
+        example: "2024-05-20T14:32:01Z"
+        type: string
+      tokens_processed:
+        example: 450
+        type: integer
+    type: object
+  internal_handlers.LogListResponse:
+    properties:
+      logs:
+        items:
+          $ref: '#/definitions/internal_handlers.LogEntryDoc'
+        type: array
+      page:
+        example: 1
+        type: integer
+      total_records:
+        example: 10450
+        type: integer
+    type: object
   internal_handlers.MsgDoc:
     properties:
       content:
@@ -212,6 +256,90 @@ paths:
       summary: Generate a new API key
       tags:
       - Key Management
+  /api/keys/{id}/revoke:
+    patch:
+      description: Marks an EdgeMask API key as inactive. Subsequent proxy requests
+        with this key will be rejected.
+      parameters:
+      - description: Key ID to revoke
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+      security:
+      - SupabaseJWT: []
+      summary: Revoke an API key
+      tags:
+      - Key Management
+  /api/logs:
+    get:
+      description: Returns paginated request logs with PII redaction metadata. Raw
+        prompts are NEVER stored or returned — only metadata such as PII categories,
+        model, latency, and key prefix.
+      parameters:
+      - default: 1
+        description: Page number (1-based)
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page (max 100)
+        in: query
+        maximum: 100
+        minimum: 1
+        name: per_page
+        type: integer
+      - default: false
+        description: Return only logs where PII was detected
+        in: query
+        name: pii_only
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.LogListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+      security:
+      - SupabaseJWT: []
+      summary: List filtered request logs
+      tags:
+      - Logs
   /api/providers:
     post:
       consumes:
@@ -247,6 +375,45 @@ paths:
       security:
       - SupabaseJWT: []
       summary: Save or update a provider API key
+      tags:
+      - Provider Keys
+  /api/providers/{provider}:
+    delete:
+      description: Hard deletes a customer's LLM provider API key from EdgeMask.
+      parameters:
+      - description: Provider ID to delete (openai, anthropic, gemini)
+        in: path
+        name: provider
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handlers.ErrorResponse'
+      security:
+      - SupabaseJWT: []
+      summary: Delete a provider API key
       tags:
       - Provider Keys
   /api/stats:

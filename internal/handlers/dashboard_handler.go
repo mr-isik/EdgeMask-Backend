@@ -30,7 +30,9 @@ func NewDashboardHandler(
 	app.Post("/keys", h.CreateKey)
 	app.Patch("/keys/:id/revoke", h.RevokeKey)
 
+	app.Get("/providers", h.ListProviderKeys)
 	app.Post("/providers", h.SaveProviderKey)
+	app.Put("/providers", h.SaveProviderKey)
 	app.Delete("/providers/:provider", h.DeleteProviderKey)
 }
 
@@ -270,5 +272,31 @@ func (h *DashboardHandler) DeleteProviderKey(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message":  "provider key deleted successfully",
 		"provider": provider,
+	})
+}
+
+// ListProviderKeys godoc
+// @Summary      List configured provider API keys
+// @Description  Returns all LLM provider API keys configured for the authenticated user (without revealing the actual secure key strings).
+// @Tags         Provider Keys
+// @Produce      json
+// @Success      200  {object}  map[string]interface{}
+// @Failure      401  {object}  ErrorResponse
+// @Failure      500  {object}  ErrorResponse
+// @Security     SupabaseJWT
+// @Router       /api/providers [get]
+func (h *DashboardHandler) ListProviderKeys(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+
+	keys, err := h.providerRepo.ListProviderKeys(c.Context(), userID)
+	if err != nil {
+		logger.Error("Failed to list provider keys: ", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to list provider keys",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"providers": keys,
 	})
 }

@@ -22,6 +22,7 @@ type KeyRepository interface {
 // ProviderKeyRepository handles storage/retrieval of customer-owned LLM provider keys.
 type ProviderKeyRepository interface {
 	GetProviderKey(ctx context.Context, userID string, provider ProviderID) (*CustomerProviderKey, error)
+	ListProviderKeys(ctx context.Context, userID string) ([]CustomerProviderKey, error)
 	SaveProviderKey(ctx context.Context, userID string, provider ProviderID, encryptedKey string, keyHint string) error
 	DeleteProviderKey(ctx context.Context, userID string, provider ProviderID) error
 }

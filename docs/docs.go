@@ -116,6 +116,130 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/keys/{id}/revoke": {
+            "patch": {
+                "security": [
+                    {
+                        "SupabaseJWT": []
+                    }
+                ],
+                "description": "Marks an EdgeMask API key as inactive. Subsequent proxy requests with this key will be rejected.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Key Management"
+                ],
+                "summary": "Revoke an API key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Key ID to revoke",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/logs": {
+            "get": {
+                "security": [
+                    {
+                        "SupabaseJWT": []
+                    }
+                ],
+                "description": "Returns paginated request logs with PII redaction metadata. Raw prompts are NEVER stored or returned — only metadata such as PII categories, model, latency, and key prefix.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Logs"
+                ],
+                "summary": "List filtered request logs",
+                "parameters": [
+                    {
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number (1-based)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Items per page (max 100)",
+                        "name": "per_page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Return only logs where PII was detected",
+                        "name": "pii_only",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.LogListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/providers": {
             "post": {
                 "security": [
@@ -160,6 +284,67 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/providers/{provider}": {
+            "delete": {
+                "security": [
+                    {
+                        "SupabaseJWT": []
+                    }
+                ],
+                "description": "Hard deletes a customer's LLM provider API key from EdgeMask.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Provider Keys"
+                ],
+                "summary": "Delete a provider API key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Provider ID to delete (openai, anthropic, gemini)",
+                        "name": "provider",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/internal_handlers.ErrorResponse"
                         }
@@ -432,6 +617,68 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/internal_handlers.APIKeyDoc"
                     }
+                }
+            }
+        },
+        "internal_handlers.LogEntryDoc": {
+            "type": "object",
+            "properties": {
+                "api_key_prefix": {
+                    "type": "string",
+                    "example": "edgemask_live_f4a2"
+                },
+                "latency_ms": {
+                    "type": "integer",
+                    "example": 8
+                },
+                "log_id": {
+                    "type": "string",
+                    "example": "req_8f7d6a..."
+                },
+                "model_used": {
+                    "type": "string",
+                    "example": "gpt-4-turbo"
+                },
+                "pii_detected": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "scrubbed_items": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "CREDIT_CARD",
+                        "EMAIL"
+                    ]
+                },
+                "timestamp": {
+                    "type": "string",
+                    "example": "2024-05-20T14:32:01Z"
+                },
+                "tokens_processed": {
+                    "type": "integer",
+                    "example": 450
+                }
+            }
+        },
+        "internal_handlers.LogListResponse": {
+            "type": "object",
+            "properties": {
+                "logs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_handlers.LogEntryDoc"
+                    }
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "total_records": {
+                    "type": "integer",
+                    "example": 10450
                 }
             }
         },

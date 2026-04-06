@@ -157,9 +157,6 @@ func (s *proxyService) Forward(
 		logger.Error("Failed to scrub request body: ", scrubErr)
 		return nil, nil, domain.ForwardResult{StatusCode: http.StatusBadRequest}, fmt.Errorf("failed to scrub request body: %w", scrubErr)
 	}
-	if sr.totalRedacted > 0 {
-		logger.Info(fmt.Sprintf("Redacted %d PII item(s) before forwarding to %s", sr.totalRedacted, providerID))
-	}
 
 	// 5. Forward to provider with the customer's key
 	body, respHeaders, statusCode, err := provider.Forward(ctx, sr.body, decryptedKey, headers)

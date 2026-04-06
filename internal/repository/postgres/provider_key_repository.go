@@ -19,6 +19,26 @@ func NewProviderKeyRepository(db *sqlx.DB) domain.ProviderKeyRepository {
 	return &providerKeyRepository{db: db}
 }
 
+// ListProviderKeys retrieves all provider keys (without raw secrets) for a user.
+func (r *providerKeyRepository) ListProviderKeys(ctx context.Context, userID string) ([]domain.CustomerProviderKey, error) {
+	const query = `
+		SELECT id, user_id, provider, key_hint, updated_at
+		FROM customer_provider_keys
+		WHERE user_id = $1
+		ORDER BY updated_at DESC
+	`
+
+	var keys []domain.CustomerProviderKey
+	if err := r.db.SelectContext(ctx, &keys, query, userID); err != nil {
+		return nil, fmt.Errorf("failed to list provider keys: %w", err)
+	}
+	if keys == nil {
+		keys = []domain.CustomerProviderKey{}
+	}
+
+	return keys, nil
+}
+
 // GetProviderKey retrieves the encrypted provider key for a user + provider combo.
 func (r *providerKeyRepository) GetProviderKey(ctx context.Context, userID string, provider domain.ProviderID) (*domain.CustomerProviderKey, error) {
 	const query = `
