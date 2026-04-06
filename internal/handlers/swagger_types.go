@@ -88,3 +88,22 @@ type MsgDoc struct {
 	Role    string `json:"role" example:"user"`
 	Content string `json:"content" example:"Hello, how are you?"`
 }
+
+// LogListResponse is the swagger response for GET /api/logs.
+type LogListResponse struct {
+	TotalRecords int64         `json:"total_records" example:"10450"`
+	Page         int           `json:"page" example:"1"`
+	Logs         []LogEntryDoc `json:"logs"`
+}
+
+// LogEntryDoc represents a single request log entry.
+type LogEntryDoc struct {
+	LogID           string   `json:"log_id" example:"req_8f7d6a..."`
+	Timestamp       string   `json:"timestamp" example:"2024-05-20T14:32:01Z"`
+	APIKeyPrefix    string   `json:"api_key_prefix" example:"edgemask_live_f4a2"`
+	ModelUsed       string   `json:"model_used" example:"gpt-4-turbo"`
+	TokensProcessed int      `json:"tokens_processed" example:"450"`
+	PIIDetected     bool     `json:"pii_detected" example:"true"`
+	ScrubbedItems   []string `json:"scrubbed_items" example:"CREDIT_CARD,EMAIL"`
+	LatencyMs       int      `json:"latency_ms" example:"8"`
+}

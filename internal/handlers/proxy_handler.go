@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"bufio"
+	"context"
+	"encoding/json"
 	"io"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/mr-isik/edgemask-backend/internal/domain"
@@ -11,12 +14,16 @@ import (
 
 // ProxyHandler handles proxying requests to LLM providers.
 type ProxyHandler struct {
-	proxyService domain.ProxyService
+	proxyService   domain.ProxyService
+	requestLogRepo domain.RequestLogRepository
 }
 
 // NewProxyHandler creates a new ProxyHandler and registers routes.
-func NewProxyHandler(app fiber.Router, proxyService domain.ProxyService) {
-	h := &ProxyHandler{proxyService: proxyService}
+func NewProxyHandler(app fiber.Router, proxyService domain.ProxyService, requestLogRepo domain.RequestLogRepository) {
+	h := &ProxyHandler{
+		proxyService:   proxyService,
+		requestLogRepo: requestLogRepo,
+	}
 
 	app.Post("/proxy/:provider", h.HandleProxy)
 	app.Post("/proxy/:provider/*", h.HandleProxy)
@@ -38,6 +45,8 @@ func NewProxyHandler(app fiber.Router, proxyService domain.ProxyService) {
 // @Security     EdgeMaskAPIKey
 // @Router       /v1/proxy/{provider} [post]
 func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
+	start := time.Now()
+
 	userID, ok := c.Locals("user_id").(string)
 	if !ok || userID == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -63,13 +72,16 @@ func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
 		})
 	}
 
+	// Extract model name from request body for logging (best-effort).
+	modelUsed := extractModel(rawBody)
+
 	headers := c.GetReqHeaders()
 	reqHeaders := make(map[string][]string)
 	for k, v := range headers {
 		reqHeaders[k] = v
 	}
 
-	body, respHeaders, statusCode, err := h.proxyService.Forward(
+	body, respHeaders, fwdResult, err := h.proxyService.Forward(
 		c.Context(),
 		userID,
 		providerID,
@@ -78,14 +90,34 @@ func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
 	)
 	if err != nil {
 		logger.Error("Proxy error: ", err)
-		if statusCode == 0 {
-			statusCode = fiber.StatusBadGateway
-		}
-		return c.Status(statusCode).JSON(fiber.Map{
+		return c.Status(fwdResult.StatusCode).JSON(fiber.Map{
 			"error": err.Error(),
 		})
 	}
 	defer body.Close()
+
+	// ── Async request log (only metadata, NEVER raw prompts) ───────────
+	latencyMs := int(time.Since(start).Milliseconds())
+	apiKeyPrefix, _ := c.Locals("api_key_prefix").(string)
+
+	go func() {
+		logEntry := &domain.RequestLog{
+			UserID:          userID,
+			APIKeyPrefix:    apiKeyPrefix,
+			ModelUsed:       modelUsed,
+			Provider:        providerStr,
+			TokensProcessed: 0, // can be enriched later from response
+			PIIDetected:     fwdResult.PIIDetected,
+			ScrubbedItems:   fwdResult.ScrubbedItems,
+			LatencyMs:       latencyMs,
+		}
+		if logEntry.ScrubbedItems == nil {
+			logEntry.ScrubbedItems = []string{}
+		}
+		if insertErr := h.requestLogRepo.InsertLog(context.Background(), logEntry); insertErr != nil {
+			logger.Error("Failed to insert request log: ", insertErr)
+		}
+	}()
 
 	if ct := respHeaders.Get("Content-Type"); ct != "" {
 		c.Set("Content-Type", ct)
@@ -93,7 +125,7 @@ func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
 	c.Set("Cache-Control", "no-cache")
 	c.Set("X-EdgeMask-Provider", providerStr)
 
-	c.Status(statusCode)
+	c.Status(fwdResult.StatusCode)
 	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
 		buf := make([]byte, 4096)
 		for {
@@ -119,3 +151,16 @@ func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
 
 	return nil
 }
+
+// extractModel tries to read the "model" field from the JSON body.
+// Returns an empty string if parsing fails — this is best-effort.
+func extractModel(body []byte) string {
+	var partial struct {
+		Model string `json:"model"`
+	}
+	if err := json.Unmarshal(body, &partial); err != nil {
+		return ""
+	}
+	return partial.Model
+}
+

@@ -50,6 +50,7 @@ func AuthMiddleware(authService domain.AuthService) fiber.Handler {
 		c.Locals("user_id", result.UserID)
 		c.Locals("plan", result.Plan)
 		c.Locals("key_hash", hashKey(rawKey))
+		c.Locals("api_key_prefix", rawKey[:min(len(rawKey), len(domain.APIKeyPrefix)+4)])
 
 		return c.Next()
 	}

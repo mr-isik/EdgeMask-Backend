@@ -16,6 +16,14 @@ type RedactedMatch struct {
 	Position int    `json:"position"` // Start index in the input string
 }
 
+// ScrubbingResult holds the output of a scrubbing operation, including
+// which PII categories were detected. Used by the logging system.
+type ScrubbingResult struct {
+	RedactedText  string   // The text after PII replacement
+	Count         int      // Total number of PII items replaced
+	ScrubbedTypes []string // Unique PII category names found (e.g. "CREDIT_CARD", "EMAIL")
+}
+
 // DefaultScrubbingRules returns the built-in PII detection rules.
 func DefaultScrubbingRules() []ScrubbingRule {
 	return []ScrubbingRule{

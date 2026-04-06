@@ -86,6 +86,7 @@ func main() {
 	keyRepo := pgRepo.NewKeyRepository(db)
 	providerKeyRepo := pgRepo.NewProviderKeyRepository(db)
 	analyticsRepo := pgRepo.NewAnalyticsRepository(db)
+	requestLogRepo := pgRepo.NewRequestLogRepository(db)
 	keyCache := redisRepo.NewKeyCache(redisClient)
 
 	// ─── Services ──────────────────────────────────────────────
@@ -134,13 +135,14 @@ func main() {
 	// ─── Routes: /v1/* (Proxy — edgemask_live_ key auth) ──────
 	v1 := app.Group("/v1")
 	v1.Use(handlers.AuthMiddleware(authSvc))
-	handlers.NewProxyHandler(v1, proxySvc)
+	handlers.NewProxyHandler(v1, proxySvc, requestLogRepo)
 
 	// ─── Routes: /api/* (Dashboard — Supabase JWT auth) ───────
 	api := app.Group("/api")
 	api.Use(handlers.DashboardMiddleware(cfg.SupabaseURL))
 	handlers.NewDashboardHandler(api, keyRepo, providerKeyRepo, encSvc)
 	handlers.NewAnalyticsHandler(api, analyticsRepo)
+	handlers.NewLogHandler(api, requestLogRepo)
 
 	// ─── Start Server ──────────────────────────────────────────
 	addr := fmt.Sprintf(":%s", cfg.Port)

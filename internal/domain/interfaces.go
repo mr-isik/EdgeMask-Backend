@@ -39,6 +39,12 @@ type AnalyticsRepository interface {
 	GetUsageChart(ctx context.Context, userID string, interval string, days int) ([]UsageDataPoint, error)
 }
 
+// RequestLogRepository handles storage and retrieval of filtered request logs.
+type RequestLogRepository interface {
+	InsertLog(ctx context.Context, log *RequestLog) error
+	GetLogs(ctx context.Context, userID string, filter RequestLogFilter) (*RequestLogPage, error)
+}
+
 // RedisKeyCache handles fast key-to-user lookups in Redis.
 type RedisKeyCache interface {
 	GetCachedKey(ctx context.Context, keyHash string) (*KeyLookupResult, error)
@@ -60,9 +66,9 @@ type EncryptionService interface {
 }
 
 type ScrubbingService interface {
-	Redact(text string) (string, int)
+	Redact(text string) ScrubbingResult
 }
 
 type ProxyService interface {
-	Forward(ctx context.Context, userID string, providerID ProviderID, rawBody []byte, headers http.Header) (body io.ReadCloser, respHeaders http.Header, statusCode int, err error)
+	Forward(ctx context.Context, userID string, providerID ProviderID, rawBody []byte, headers http.Header) (body io.ReadCloser, respHeaders http.Header, result ForwardResult, err error)
 }
