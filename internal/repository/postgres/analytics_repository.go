@@ -41,9 +41,9 @@ func (r *analyticsRepository) GetAggregateStats(ctx context.Context, userID stri
 	const query = `
 		SELECT
 			COALESCE(COUNT(*), 0) AS total_requests,
-			COALESCE(SUM(pii_redacted), 0) AS total_pii_redacted,
-			COALESCE(SUM(tokens_used), 0) AS total_tokens_used
-		FROM usage_logs
+			COALESCE(SUM(cardinality(scrubbed_items)), 0) AS total_pii_redacted,
+			COALESCE(SUM(tokens_processed), 0) AS total_tokens_used
+		FROM request_logs
 		WHERE user_id = $1
 	`
 
@@ -62,9 +62,9 @@ func (r *analyticsRepository) GetUsageChart(ctx context.Context, userID string, 
 		SELECT
 			TO_CHAR(date_trunc($1, created_at), 'YYYY-MM-DD"T"HH24:MI') AS period,
 			COUNT(*) AS requests,
-			COALESCE(SUM(pii_redacted), 0) AS pii_redacted,
-			COALESCE(SUM(tokens_used), 0) AS tokens_used
-		FROM usage_logs
+			COALESCE(SUM(cardinality(scrubbed_items)), 0) AS pii_redacted,
+			COALESCE(SUM(tokens_processed), 0) AS tokens_used
+		FROM request_logs
 		WHERE user_id = $2
 		  AND created_at >= NOW() - ($3 || ' days')::INTERVAL
 		GROUP BY date_trunc($1, created_at)

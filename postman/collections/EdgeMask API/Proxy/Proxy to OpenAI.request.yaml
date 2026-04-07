@@ -1,23 +1,22 @@
 $kind: http-request
 name: Proxy to OpenAI
 method: POST
-url: '{{baseUrl}}/v1/proxy/openai'
-description: 'Scrubs PII from the request body, then forwards it to OpenAI using the customer own API key. Supports streaming (SSE) responses.'
+url: "{{baseUrl}}/v1/proxy/openai"
+description: Scrubs PII from the request body, then forwards it to OpenAI using
+  the customer own API key. Supports streaming (SSE) responses.
 headers:
-  - key: Authorization
-    value: 'Bearer {{edgemaskApiKey}}'
-  - key: Content-Type
-    value: application/json
+  Authorization: Bearer {{edgemaskApiKey}}
+  Content-Type: application/json
 body:
   type: json
-  content: |-
+  content: >-
     {
-      "model": "gpt-4o",
+      "model": "gpt-5.4-mini",
       "stream": false,
       "messages": [
         {
           "role": "user",
-          "content": "Hello, my name is John Doe and my email is john@example.com. Can you help me?"
+          "content": "Hello, my name is John Doe and my phone number is +90 552 332 24 05. Can you help me?"
         }
       ]
     }
