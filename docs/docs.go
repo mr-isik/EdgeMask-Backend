@@ -43,19 +43,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ListKeysResponse"
+                            "$ref": "#/definitions/handlers.ListKeysResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -84,7 +84,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.CreateKeyReq"
+                            "$ref": "#/definitions/handlers.CreateKeyReq"
                         }
                     }
                 ],
@@ -92,25 +92,25 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.CreateKeyResp"
+                            "$ref": "#/definitions/handlers.CreateKeyResp"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -153,19 +153,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -216,31 +216,121 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.LogListResponse"
+                            "$ref": "#/definitions/handlers.LogListResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
             }
         },
         "/api/providers": {
+            "get": {
+                "security": [
+                    {
+                        "SupabaseJWT": []
+                    }
+                ],
+                "description": "Returns all LLM provider API keys configured for the authenticated user (without revealing the actual secure key strings).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Provider Keys"
+                ],
+                "summary": "List configured provider API keys",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ListProviderKeysResp"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "SupabaseJWT": []
+                    }
+                ],
+                "description": "Updates an existing customer's LLM provider key securely.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Provider Keys"
+                ],
+                "summary": "Update a provider API key",
+                "parameters": [
+                    {
+                        "description": "Provider key to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SaveProviderKeyReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SaveProviderKeyResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -265,7 +355,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.SaveProviderKeyReq"
+                            "$ref": "#/definitions/handlers.SaveProviderKeyReq"
                         }
                     }
                 ],
@@ -273,25 +363,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.SaveProviderKeyResp"
+                            "$ref": "#/definitions/handlers.SaveProviderKeyResp"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -334,25 +424,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -377,19 +467,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.AggregateStatsResp"
+                            "$ref": "#/definitions/handlers.AggregateStatsResp"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -436,25 +526,25 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.UsageChartResp"
+                            "$ref": "#/definitions/handlers.UsageChartResp"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -498,7 +588,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ProxyReq"
+                            "$ref": "#/definitions/handlers.ProxyReq"
                         }
                     }
                 ],
@@ -512,19 +602,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     },
                     "502": {
                         "description": "Bad Gateway",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ErrorResponse"
+                            "$ref": "#/definitions/handlers.ErrorResponse"
                         }
                     }
                 }
@@ -532,7 +622,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "internal_handlers.APIKeyDoc": {
+        "handlers.APIKeyDoc": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -561,7 +651,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.AggregateStatsResp": {
+        "handlers.AggregateStatsResp": {
             "type": "object",
             "properties": {
                 "total_pii_redacted": {
@@ -578,7 +668,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.CreateKeyReq": {
+        "handlers.CreateKeyReq": {
             "type": "object",
             "properties": {
                 "name": {
@@ -587,7 +677,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.CreateKeyResp": {
+        "handlers.CreateKeyResp": {
             "type": "object",
             "properties": {
                 "key": {
@@ -600,7 +690,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.ErrorResponse": {
+        "handlers.ErrorResponse": {
             "type": "object",
             "properties": {
                 "error": {
@@ -609,18 +699,29 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.ListKeysResponse": {
+        "handlers.ListKeysResponse": {
             "type": "object",
             "properties": {
                 "keys": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_handlers.APIKeyDoc"
+                        "$ref": "#/definitions/handlers.APIKeyDoc"
                     }
                 }
             }
         },
-        "internal_handlers.LogEntryDoc": {
+        "handlers.ListProviderKeysResp": {
+            "type": "object",
+            "properties": {
+                "providers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.ProviderKeyDoc"
+                    }
+                }
+            }
+        },
+        "handlers.LogEntryDoc": {
             "type": "object",
             "properties": {
                 "api_key_prefix": {
@@ -663,13 +764,13 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.LogListResponse": {
+        "handlers.LogListResponse": {
             "type": "object",
             "properties": {
                 "logs": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_handlers.LogEntryDoc"
+                        "$ref": "#/definitions/handlers.LogEntryDoc"
                     }
                 },
                 "page": {
@@ -682,7 +783,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.MsgDoc": {
+        "handlers.MsgDoc": {
             "type": "object",
             "properties": {
                 "content": {
@@ -695,13 +796,30 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.ProxyReq": {
+        "handlers.ProviderKeyDoc": {
+            "type": "object",
+            "properties": {
+                "key_hint": {
+                    "type": "string",
+                    "example": "sk-...c123"
+                },
+                "provider": {
+                    "type": "string",
+                    "example": "openai"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2026-04-01T12:00:00Z"
+                }
+            }
+        },
+        "handlers.ProxyReq": {
             "type": "object",
             "properties": {
                 "messages": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_handlers.MsgDoc"
+                        "$ref": "#/definitions/handlers.MsgDoc"
                     }
                 },
                 "model": {
@@ -714,7 +832,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.SaveProviderKeyReq": {
+        "handlers.SaveProviderKeyReq": {
             "type": "object",
             "properties": {
                 "api_key": {
@@ -732,7 +850,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.SaveProviderKeyResp": {
+        "handlers.SaveProviderKeyResp": {
             "type": "object",
             "properties": {
                 "hint": {
@@ -749,13 +867,13 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.UsageChartResp": {
+        "handlers.UsageChartResp": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_handlers.UsagePointDoc"
+                        "$ref": "#/definitions/handlers.UsagePointDoc"
                     }
                 },
                 "days": {
@@ -768,7 +886,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.UsagePointDoc": {
+        "handlers.UsagePointDoc": {
             "type": "object",
             "properties": {
                 "period": {

@@ -32,7 +32,7 @@ func NewDashboardHandler(
 
 	app.Get("/providers", h.ListProviderKeys)
 	app.Post("/providers", h.SaveProviderKey)
-	app.Put("/providers", h.SaveProviderKey)
+	app.Put("/providers", h.UpdateProviderKey)
 	app.Delete("/providers/:provider", h.DeleteProviderKey)
 }
 
@@ -179,6 +179,23 @@ func (h *DashboardHandler) SaveProviderKey(c *fiber.Ctx) error {
 	})
 }
 
+// UpdateProviderKey godoc
+// @Summary      Update a provider API key
+// @Description  Updates an existing customer's LLM provider key securely.
+// @Tags         Provider Keys
+// @Accept       json
+// @Produce      json
+// @Param        body  body      SaveProviderKeyReq   true  "Provider key to update"
+// @Success      200   {object}  SaveProviderKeyResp
+// @Failure      400   {object}  ErrorResponse
+// @Failure      401   {object}  ErrorResponse
+// @Failure      500   {object}  ErrorResponse
+// @Security     SupabaseJWT
+// @Router       /api/providers [put]
+func (h *DashboardHandler) UpdateProviderKey(c *fiber.Ctx) error {
+	return h.SaveProviderKey(c)
+}
+
 func generateKeyHint(key string) string {
 	if len(key) <= 8 {
 		return "****"
@@ -280,7 +297,7 @@ func (h *DashboardHandler) DeleteProviderKey(c *fiber.Ctx) error {
 // @Description  Returns all LLM provider API keys configured for the authenticated user (without revealing the actual secure key strings).
 // @Tags         Provider Keys
 // @Produce      json
-// @Success      200  {object}  map[string]interface{}
+// @Success      200  {object}  ListProviderKeysResp
 // @Failure      401  {object}  ErrorResponse
 // @Failure      500  {object}  ErrorResponse
 // @Security     SupabaseJWT

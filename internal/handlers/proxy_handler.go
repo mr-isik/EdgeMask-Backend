@@ -94,8 +94,6 @@ func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	}
-	defer body.Close()
-
 	// ── Async request log (only metadata, NEVER raw prompts) ───────────
 	latencyMs := int(time.Since(start).Milliseconds())
 	apiKeyPrefix, _ := c.Locals("api_key_prefix").(string)
@@ -127,6 +125,7 @@ func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
 
 	c.Status(fwdResult.StatusCode)
 	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		defer body.Close() // Ensure body is closed when stream writer finishes
 		buf := make([]byte, 4096)
 		for {
 			n, readErr := body.Read(buf)

@@ -1,6 +1,6 @@
 basePath: /
 definitions:
-  internal_handlers.APIKeyDoc:
+  handlers.APIKeyDoc:
     properties:
       created_at:
         example: "2026-04-01T12:00:00Z"
@@ -21,7 +21,7 @@ definitions:
         example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
         type: string
     type: object
-  internal_handlers.AggregateStatsResp:
+  handlers.AggregateStatsResp:
     properties:
       total_pii_redacted:
         example: 3420
@@ -33,13 +33,13 @@ definitions:
         example: 1250000
         type: integer
     type: object
-  internal_handlers.CreateKeyReq:
+  handlers.CreateKeyReq:
     properties:
       name:
         example: Production Key
         type: string
     type: object
-  internal_handlers.CreateKeyResp:
+  handlers.CreateKeyResp:
     properties:
       key:
         example: edgemask_live_a1b2c3d4e5f6...
@@ -48,20 +48,27 @@ definitions:
         example: Save this key securely. It will NOT be shown again.
         type: string
     type: object
-  internal_handlers.ErrorResponse:
+  handlers.ErrorResponse:
     properties:
       error:
         example: something went wrong
         type: string
     type: object
-  internal_handlers.ListKeysResponse:
+  handlers.ListKeysResponse:
     properties:
       keys:
         items:
-          $ref: '#/definitions/internal_handlers.APIKeyDoc'
+          $ref: '#/definitions/handlers.APIKeyDoc'
         type: array
     type: object
-  internal_handlers.LogEntryDoc:
+  handlers.ListProviderKeysResp:
+    properties:
+      providers:
+        items:
+          $ref: '#/definitions/handlers.ProviderKeyDoc'
+        type: array
+    type: object
+  handlers.LogEntryDoc:
     properties:
       api_key_prefix:
         example: edgemask_live_f4a2
@@ -92,11 +99,11 @@ definitions:
         example: 450
         type: integer
     type: object
-  internal_handlers.LogListResponse:
+  handlers.LogListResponse:
     properties:
       logs:
         items:
-          $ref: '#/definitions/internal_handlers.LogEntryDoc'
+          $ref: '#/definitions/handlers.LogEntryDoc'
         type: array
       page:
         example: 1
@@ -105,7 +112,7 @@ definitions:
         example: 10450
         type: integer
     type: object
-  internal_handlers.MsgDoc:
+  handlers.MsgDoc:
     properties:
       content:
         example: Hello, how are you?
@@ -114,11 +121,23 @@ definitions:
         example: user
         type: string
     type: object
-  internal_handlers.ProxyReq:
+  handlers.ProviderKeyDoc:
+    properties:
+      key_hint:
+        example: sk-...c123
+        type: string
+      provider:
+        example: openai
+        type: string
+      updated_at:
+        example: "2026-04-01T12:00:00Z"
+        type: string
+    type: object
+  handlers.ProxyReq:
     properties:
       messages:
         items:
-          $ref: '#/definitions/internal_handlers.MsgDoc'
+          $ref: '#/definitions/handlers.MsgDoc'
         type: array
       model:
         example: gpt-4o
@@ -127,7 +146,7 @@ definitions:
         example: true
         type: boolean
     type: object
-  internal_handlers.SaveProviderKeyReq:
+  handlers.SaveProviderKeyReq:
     properties:
       api_key:
         example: sk-proj-abc123...
@@ -140,7 +159,7 @@ definitions:
         example: openai
         type: string
     type: object
-  internal_handlers.SaveProviderKeyResp:
+  handlers.SaveProviderKeyResp:
     properties:
       hint:
         example: sk-p...c123
@@ -152,11 +171,11 @@ definitions:
         example: openai
         type: string
     type: object
-  internal_handlers.UsageChartResp:
+  handlers.UsageChartResp:
     properties:
       data:
         items:
-          $ref: '#/definitions/internal_handlers.UsagePointDoc'
+          $ref: '#/definitions/handlers.UsagePointDoc'
         type: array
       days:
         example: 7
@@ -165,7 +184,7 @@ definitions:
         example: day
         type: string
     type: object
-  internal_handlers.UsagePointDoc:
+  handlers.UsagePointDoc:
     properties:
       period:
         example: 2026-04-01T00:00
@@ -206,15 +225,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_handlers.ListKeysResponse'
+            $ref: '#/definitions/handlers.ListKeysResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - SupabaseJWT: []
       summary: List all API keys
@@ -231,26 +250,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.CreateKeyReq'
+          $ref: '#/definitions/handlers.CreateKeyReq'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_handlers.CreateKeyResp'
+            $ref: '#/definitions/handlers.CreateKeyResp'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - SupabaseJWT: []
       summary: Generate a new API key
@@ -278,15 +297,15 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - SupabaseJWT: []
       summary: Revoke an API key
@@ -322,25 +341,48 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_handlers.LogListResponse'
+            $ref: '#/definitions/handlers.LogListResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - SupabaseJWT: []
       summary: List filtered request logs
       tags:
       - Logs
   /api/providers:
+    get:
+      description: Returns all LLM provider API keys configured for the authenticated
+        user (without revealing the actual secure key strings).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ListProviderKeysResp'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - SupabaseJWT: []
+      summary: List configured provider API keys
+      tags:
+      - Provider Keys
     post:
       consumes:
       - application/json
@@ -352,29 +394,64 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.SaveProviderKeyReq'
+          $ref: '#/definitions/handlers.SaveProviderKeyReq'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_handlers.SaveProviderKeyResp'
+            $ref: '#/definitions/handlers.SaveProviderKeyResp'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - SupabaseJWT: []
       summary: Save or update a provider API key
+      tags:
+      - Provider Keys
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing customer's LLM provider key securely.
+      parameters:
+      - description: Provider key to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.SaveProviderKeyReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.SaveProviderKeyResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - SupabaseJWT: []
+      summary: Update a provider API key
       tags:
       - Provider Keys
   /api/providers/{provider}:
@@ -398,19 +475,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - SupabaseJWT: []
       summary: Delete a provider API key
@@ -426,15 +503,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_handlers.AggregateStatsResp'
+            $ref: '#/definitions/handlers.AggregateStatsResp'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - SupabaseJWT: []
       summary: Get aggregate statistics
@@ -466,19 +543,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_handlers.UsageChartResp'
+            $ref: '#/definitions/handlers.UsageChartResp'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - SupabaseJWT: []
       summary: Get usage chart data
@@ -506,7 +583,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.ProxyReq'
+          $ref: '#/definitions/handlers.ProxyReq'
       produces:
       - application/json
       - text/event-stream
@@ -518,15 +595,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
         "502":
           description: Bad Gateway
           schema:
-            $ref: '#/definitions/internal_handlers.ErrorResponse'
+            $ref: '#/definitions/handlers.ErrorResponse'
       security:
       - EdgeMaskAPIKey: []
       summary: Proxy request to LLM provider
