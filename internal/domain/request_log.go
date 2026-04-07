@@ -12,6 +12,7 @@ type RequestLog struct {
 	Provider        string    `json:"provider" db:"provider"`
 	TokensProcessed int       `json:"tokens_processed" db:"tokens_processed"`
 	PIIDetected     bool      `json:"pii_detected" db:"pii_detected"`
+	SemanticCacheHit bool     `json:"semantic_cache_hit" db:"semantic_cache_hit"`
 	ScrubbedItems   []string  `json:"scrubbed_items" db:"scrubbed_items"`
 	LatencyMs       int       `json:"latency_ms" db:"latency_ms"`
 	CreatedAt       time.Time `json:"timestamp" db:"created_at"`
@@ -38,4 +39,5 @@ type ForwardResult struct {
 	PIIDetected   bool
 	ScrubbedItems []string
 	RedactCount   int
+	SemanticCacheHit bool
 }

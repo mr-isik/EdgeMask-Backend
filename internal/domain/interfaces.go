@@ -53,6 +53,18 @@ type RedisKeyCache interface {
 	InvalidateKey(ctx context.Context, keyHash string) error
 }
 
+// SemanticResponseCache stores serialized model responses in Redis.
+type SemanticResponseCache interface {
+	Get(ctx context.Context, key string) ([]byte, error)
+	Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
+}
+
+// SemanticCacheRepository stores and queries semantic cache vectors in PostgreSQL.
+type SemanticCacheRepository interface {
+	FindNearest(ctx context.Context, req SemanticLookupRequest) (*SemanticCacheHit, error)
+	UpsertEntry(ctx context.Context, entry SemanticCacheEntry) error
+}
+
 // ---------------------------------------------------------------------------
 // Service Interfaces
 // ---------------------------------------------------------------------------
@@ -72,4 +84,9 @@ type ScrubbingService interface {
 
 type ProxyService interface {
 	Forward(ctx context.Context, userID string, providerID ProviderID, rawBody []byte, headers http.Header) (body io.ReadCloser, respHeaders http.Header, result ForwardResult, err error)
+}
+
+// EmbeddingService converts a text prompt into a float embedding vector.
+type EmbeddingService interface {
+	Embed(ctx context.Context, text string, apiKey string) ([]float32, error)
 }

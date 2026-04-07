@@ -23,8 +23,8 @@ func NewRequestLogRepository(db *sqlx.DB) domain.RequestLogRepository {
 // Designed to be called from a goroutine for non-blocking operation.
 func (r *requestLogRepository) InsertLog(ctx context.Context, log *domain.RequestLog) error {
 	const query = `
-		INSERT INTO request_logs (user_id, api_key_prefix, model_used, provider, tokens_processed, pii_detected, scrubbed_items, latency_ms)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO request_logs (user_id, api_key_prefix, model_used, provider, tokens_processed, pii_detected, semantic_cache_hit, scrubbed_items, latency_ms)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 
 	if _, err := r.db.ExecContext(ctx, query,
@@ -34,6 +34,7 @@ func (r *requestLogRepository) InsertLog(ctx context.Context, log *domain.Reques
 		log.Provider,
 		log.TokensProcessed,
 		log.PIIDetected,
+		log.SemanticCacheHit,
 		pq.Array(log.ScrubbedItems),
 		log.LatencyMs,
 	); err != nil {
@@ -76,7 +77,7 @@ func (r *requestLogRepository) GetLogs(ctx context.Context, userID string, filte
 	// ── Data query ─────────────────────────────────────────────────────
 	dataQuery := `
 		SELECT id, user_id, api_key_prefix, model_used, provider,
-		       tokens_processed, pii_detected, scrubbed_items, latency_ms, created_at
+		       tokens_processed, pii_detected, semantic_cache_hit, scrubbed_items, latency_ms, created_at
 		FROM request_logs
 		WHERE user_id = $1
 	`
@@ -109,6 +110,7 @@ func (r *requestLogRepository) GetLogs(ctx context.Context, userID string, filte
 			&log.Provider,
 			&log.TokensProcessed,
 			&log.PIIDetected,
+			&log.SemanticCacheHit,
 			pq.Array(&log.ScrubbedItems),
 			&log.LatencyMs,
 			&log.CreatedAt,

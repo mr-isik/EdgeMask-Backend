@@ -68,9 +68,12 @@ type ProviderKeyDoc struct {
 
 // AggregateStatsResp is the swagger response for GET /api/stats.
 type AggregateStatsResp struct {
-	TotalRequests    int64 `json:"total_requests" example:"12450"`
-	TotalPIIRedacted int64 `json:"total_pii_redacted" example:"3420"`
-	TotalTokensUsed  int64 `json:"total_tokens_used" example:"1250000"`
+	TotalRequests            int64   `json:"total_requests" example:"12450"`
+	TotalPIIRedacted         int64   `json:"total_pii_redacted" example:"3420"`
+	TotalTokensUsed          int64   `json:"total_tokens_used" example:"1250000"`
+	TotalSemanticCacheHits   int64   `json:"total_semantic_cache_hits" example:"8200"`
+	TotalSemanticCacheMisses int64   `json:"total_semantic_cache_misses" example:"4250"`
+	SemanticCacheHitRate     float64 `json:"semantic_cache_hit_rate" example:"0.66"`
 }
 
 // UsageChartResp is the swagger response for GET /api/usage-chart.
@@ -82,10 +85,12 @@ type UsageChartResp struct {
 
 // UsagePointDoc represents a single chart data point.
 type UsagePointDoc struct {
-	Period      string `json:"period" example:"2026-04-01T00:00"`
-	Requests    int64  `json:"requests" example:"150"`
-	PIIRedacted int64  `json:"pii_redacted" example:"42"`
-	TokensUsed  int64  `json:"tokens_used" example:"25000"`
+	Period              string `json:"period" example:"2026-04-01T00:00"`
+	Requests            int64  `json:"requests" example:"150"`
+	PIIRedacted         int64  `json:"pii_redacted" example:"42"`
+	TokensUsed          int64  `json:"tokens_used" example:"25000"`
+	SemanticCacheHits   int64  `json:"semantic_cache_hits" example:"98"`
+	SemanticCacheMisses int64  `json:"semantic_cache_misses" example:"52"`
 }
 
 // ProxyReq represents the OpenAI-format request body for proxy.
@@ -116,6 +121,7 @@ type LogEntryDoc struct {
 	ModelUsed       string   `json:"model_used" example:"gpt-4-turbo"`
 	TokensProcessed int      `json:"tokens_processed" example:"450"`
 	PIIDetected     bool     `json:"pii_detected" example:"true"`
+	SemanticCacheHit bool    `json:"semantic_cache_hit" example:"false"`
 	ScrubbedItems   []string `json:"scrubbed_items" example:"CREDIT_CARD,EMAIL"`
 	LatencyMs       int      `json:"latency_ms" example:"8"`
 }

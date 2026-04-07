@@ -42,7 +42,10 @@ func (r *analyticsRepository) GetAggregateStats(ctx context.Context, userID stri
 		SELECT
 			COALESCE(COUNT(*), 0) AS total_requests,
 			COALESCE(SUM(cardinality(scrubbed_items)), 0) AS total_pii_redacted,
-			COALESCE(SUM(tokens_processed), 0) AS total_tokens_used
+			COALESCE(SUM(tokens_processed), 0) AS total_tokens_used,
+			COALESCE(SUM(CASE WHEN semantic_cache_hit THEN 1 ELSE 0 END), 0) AS total_semantic_cache_hits,
+			COALESCE(SUM(CASE WHEN semantic_cache_hit THEN 0 ELSE 1 END), 0) AS total_semantic_cache_misses,
+			COALESCE(AVG(CASE WHEN semantic_cache_hit THEN 1.0 ELSE 0.0 END), 0)::float8 AS semantic_cache_hit_rate
 		FROM request_logs
 		WHERE user_id = $1
 	`
@@ -63,7 +66,9 @@ func (r *analyticsRepository) GetUsageChart(ctx context.Context, userID string, 
 			TO_CHAR(date_trunc($1, created_at), 'YYYY-MM-DD"T"HH24:MI') AS period,
 			COUNT(*) AS requests,
 			COALESCE(SUM(cardinality(scrubbed_items)), 0) AS pii_redacted,
-			COALESCE(SUM(tokens_processed), 0) AS tokens_used
+			COALESCE(SUM(tokens_processed), 0) AS tokens_used,
+			COALESCE(SUM(CASE WHEN semantic_cache_hit THEN 1 ELSE 0 END), 0) AS semantic_cache_hits,
+			COALESCE(SUM(CASE WHEN semantic_cache_hit THEN 0 ELSE 1 END), 0) AS semantic_cache_misses
 		FROM request_logs
 		WHERE user_id = $2
 		  AND created_at >= NOW() - ($3 || ' days')::INTERVAL

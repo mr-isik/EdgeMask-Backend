@@ -1,11 +1,16 @@
 package services
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/mr-isik/edgemask-backend/internal/domain"
 	"github.com/mr-isik/edgemask-backend/pkg/logger"
@@ -28,10 +33,16 @@ type scrubResult struct {
 // proxyService implements domain.ProxyService.
 // Orchestrates: fetch customer key → scrub PII → select provider → forward.
 type proxyService struct {
-	scrubber     domain.ScrubbingService
-	encryption   domain.EncryptionService
-	providerKeys domain.ProviderKeyRepository
-	providers    map[domain.ProviderID]domain.LLMProvider
+	scrubber           domain.ScrubbingService
+	encryption         domain.EncryptionService
+	providerKeys       domain.ProviderKeyRepository
+	providers          map[domain.ProviderID]domain.LLMProvider
+	semanticEnabled    bool
+	semanticTTL        time.Duration
+	semanticSimilarity float64
+	semanticRepo       domain.SemanticCacheRepository
+	semanticRespCache  domain.SemanticResponseCache
+	embeddingSvc       domain.EmbeddingService
 }
 
 // NewProxyService creates a new ProxyService with the given dependencies.
@@ -39,6 +50,12 @@ func NewProxyService(
 	scrubber domain.ScrubbingService,
 	encryption domain.EncryptionService,
 	providerKeys domain.ProviderKeyRepository,
+	semanticEnabled bool,
+	semanticTTL time.Duration,
+	semanticSimilarity float64,
+	semanticRepo domain.SemanticCacheRepository,
+	semanticRespCache domain.SemanticResponseCache,
+	embeddingSvc domain.EmbeddingService,
 	providers ...domain.LLMProvider,
 ) domain.ProxyService {
 	pm := make(map[domain.ProviderID]domain.LLMProvider, len(providers))
@@ -48,11 +65,46 @@ func NewProxyService(
 	}
 
 	return &proxyService{
-		scrubber:     scrubber,
-		encryption:   encryption,
-		providerKeys: providerKeys,
-		providers:    pm,
+		scrubber:           scrubber,
+		encryption:         encryption,
+		providerKeys:       providerKeys,
+		providers:          pm,
+		semanticEnabled:    semanticEnabled,
+		semanticTTL:        semanticTTL,
+		semanticSimilarity: semanticSimilarity,
+		semanticRepo:       semanticRepo,
+		semanticRespCache:  semanticRespCache,
+		embeddingSvc:       embeddingSvc,
 	}
+}
+
+type requestMetadata struct {
+	Model      string        `json:"model"`
+	Messages   []chatMessage `json:"messages"`
+	Stream     bool          `json:"stream"`
+	PromptText string
+}
+
+func extractRequestMetadata(rawBody []byte) (*requestMetadata, error) {
+	var meta requestMetadata
+	if err := json.Unmarshal(rawBody, &meta); err != nil {
+		return nil, err
+	}
+
+	var b strings.Builder
+	for _, msg := range meta.Messages {
+		if strings.TrimSpace(msg.Content) == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString(msg.Role)
+		b.WriteString(": ")
+		b.WriteString(msg.Content)
+	}
+	meta.PromptText = b.String()
+	return &meta, nil
 }
 
 // scrubMessages performs surgical PII redaction on ONLY the messages[].content
@@ -158,7 +210,51 @@ func (s *proxyService) Forward(
 		return nil, nil, domain.ForwardResult{StatusCode: http.StatusBadRequest}, fmt.Errorf("failed to scrub request body: %w", scrubErr)
 	}
 
-	// 5. Forward to provider with the customer's key
+	// 5. Semantic cache lookup (disabled for streaming requests)
+	var promptHash string
+	meta, metaErr := extractRequestMetadata(sr.body)
+	if metaErr == nil && s.semanticEnabled && !meta.Stream && meta.Model != "" && meta.PromptText != "" &&
+		s.semanticRepo != nil && s.semanticRespCache != nil && s.embeddingSvc != nil {
+		openaiKeyRecord, openaiErr := s.providerKeys.GetProviderKey(ctx, userID, domain.ProviderOpenAI)
+		if openaiErr == nil {
+			openaiPlainKey, decErr := s.encryption.Decrypt(openaiKeyRecord.EncryptedKey)
+			if decErr == nil {
+				embedding, embErr := s.embeddingSvc.Embed(ctx, meta.PromptText, openaiPlainKey)
+				if embErr == nil && len(embedding) > 0 {
+					maxDistance := 1.0 - s.semanticSimilarity
+					if maxDistance < 0 {
+						maxDistance = 0
+					}
+					hit, hitErr := s.semanticRepo.FindNearest(ctx, domain.SemanticLookupRequest{
+						UserID:      userID,
+						ProviderID:  providerID,
+						Model:       meta.Model,
+						Embedding:   embedding,
+						MaxDistance: maxDistance,
+						Now:         time.Now(),
+					})
+					if hitErr == nil && hit != nil {
+						cached, cacheErr := s.semanticRespCache.Get(ctx, hit.ResponseKey)
+						if cacheErr == nil && len(cached) > 0 {
+							respHeaders := make(http.Header)
+							respHeaders.Set("Content-Type", "application/json")
+							result := domain.ForwardResult{
+								StatusCode:    http.StatusOK,
+								PIIDetected:   sr.totalRedacted > 0,
+								ScrubbedItems: sr.scrubbedTypes,
+								RedactCount:   sr.totalRedacted,
+								SemanticCacheHit: true,
+							}
+							return io.NopCloser(bytes.NewReader(cached)), respHeaders, result, nil
+						}
+					}
+					promptHash = shaHex(meta.PromptText)
+				}
+			}
+		}
+	}
+
+	// 6. Forward to provider with the customer's key
 	body, respHeaders, statusCode, err := provider.Forward(ctx, sr.body, decryptedKey, headers)
 	if err != nil {
 		logger.Error("Provider error [", string(providerID), "]: ", err)
@@ -174,8 +270,54 @@ func (s *proxyService) Forward(
 		PIIDetected:   sr.totalRedacted > 0,
 		ScrubbedItems: sr.scrubbedTypes,
 		RedactCount:   sr.totalRedacted,
+		SemanticCacheHit: false,
+	}
+
+	if metaErr == nil && s.semanticEnabled && !meta.Stream && promptHash != "" &&
+		statusCode >= 200 && statusCode < 300 && s.semanticRepo != nil &&
+		s.semanticRespCache != nil && s.embeddingSvc != nil {
+		responseBytes, readErr := io.ReadAll(body)
+		if readErr != nil {
+			return nil, nil, domain.ForwardResult{StatusCode: http.StatusBadGateway}, fmt.Errorf("failed to read upstream body: %w", readErr)
+		}
+		_ = body.Close()
+
+		responseKey := shaHex(meta.PromptText + ":" + string(providerID) + ":" + meta.Model + ":" + string(responseBytes))
+		if err := s.semanticRespCache.Set(ctx, responseKey, responseBytes, s.semanticTTL); err != nil {
+			logger.Error("semantic redis set failed: ", err)
+		} else {
+			openaiKeyRecord, openaiErr := s.providerKeys.GetProviderKey(ctx, userID, domain.ProviderOpenAI)
+			if openaiErr == nil {
+				openaiPlainKey, decErr := s.encryption.Decrypt(openaiKeyRecord.EncryptedKey)
+				if decErr == nil {
+					embedding, embErr := s.embeddingSvc.Embed(ctx, meta.PromptText, openaiPlainKey)
+					if embErr == nil {
+						repoErr := s.semanticRepo.UpsertEntry(ctx, domain.SemanticCacheEntry{
+							UserID:      userID,
+							ProviderID:  providerID,
+							Model:       meta.Model,
+							PromptHash:  promptHash,
+							PromptText:  meta.PromptText,
+							Embedding:   embedding,
+							ResponseKey: responseKey,
+							ExpiresAt:   time.Now().Add(s.semanticTTL),
+						})
+						if repoErr != nil {
+							logger.Error("semantic postgres upsert failed: ", repoErr)
+						}
+					}
+				}
+			}
+		}
+
+		return io.NopCloser(bytes.NewReader(responseBytes)), respHeaders, fwdResult, nil
 	}
 
 	return body, respHeaders, fwdResult, nil
+}
+
+func shaHex(v string) string {
+	sum := sha256.Sum256([]byte(v))
+	return hex.EncodeToString(sum[:])
 }
 

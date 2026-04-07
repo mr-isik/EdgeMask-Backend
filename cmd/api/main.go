@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -89,6 +90,8 @@ func main() {
 	analyticsRepo := pgRepo.NewAnalyticsRepository(db)
 	requestLogRepo := pgRepo.NewRequestLogRepository(db)
 	keyCache := redisRepo.NewKeyCache(redisClient)
+	semanticRepo := pgRepo.NewSemanticCacheRepository(db)
+	semanticRespCache := redisRepo.NewSemanticResponseCache(redisClient)
 
 	// ─── Services ──────────────────────────────────────────────
 	encSvc, err := services.NewEncryptionService(cfg.MasterKey)
@@ -99,13 +102,27 @@ func main() {
 
 	scrubbingSvc := services.NewScrubbingService()
 	authSvc := services.NewAuthService(keyRepo, keyCache)
+	embeddingSvc := services.NewEmbeddingService(cfg.OpenAIBaseURL, cfg.SemanticCacheEmbeddingModel)
 
 	// ─── LLM Provider Adapters (stateless, BYOK) ──────────────
 	openai := providers.NewOpenAIAdapter(cfg.OpenAIBaseURL)
 	anthropic := providers.NewAnthropicAdapter(cfg.AnthropicBaseURL)
 	gemini := providers.NewGeminiAdapter(cfg.GeminiBaseURL)
 
-	proxySvc := services.NewProxyService(scrubbingSvc, encSvc, providerKeyRepo, openai, anthropic, gemini)
+	proxySvc := services.NewProxyService(
+		scrubbingSvc,
+		encSvc,
+		providerKeyRepo,
+		cfg.SemanticCacheEnabled,
+		time.Duration(cfg.SemanticCacheTTLSeconds)*time.Second,
+		cfg.SemanticCacheSimilarityMinimum,
+		semanticRepo,
+		semanticRespCache,
+		embeddingSvc,
+		openai,
+		anthropic,
+		gemini,
+	)
 
 	// ─── Fiber App ─────────────────────────────────────────────
 	app := fiber.New(fiber.Config{

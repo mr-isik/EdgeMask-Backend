@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 	"github.com/mr-isik/edgemask-backend/pkg/logger"
@@ -34,6 +35,12 @@ type Config struct {
 	OpenAIBaseURL    string
 	AnthropicBaseURL string
 	GeminiBaseURL    string
+
+	// Semantic cache
+	SemanticCacheEnabled           bool
+	SemanticCacheTTLSeconds        int
+	SemanticCacheSimilarityMinimum float64
+	SemanticCacheEmbeddingModel    string
 }
 
 // LoadConfig reads configuration from environment variables.
@@ -59,6 +66,11 @@ func LoadConfig() *Config {
 		OpenAIBaseURL:    getEnv("OPENAI_BASE_URL", "https://api.openai.com"),
 		AnthropicBaseURL: getEnv("ANTHROPIC_BASE_URL", "https://api.anthropic.com"),
 		GeminiBaseURL:    getEnv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com"),
+
+		SemanticCacheEnabled:           getEnvBool("SEMANTIC_CACHE_ENABLED", true),
+		SemanticCacheTTLSeconds:        getEnvInt("SEMANTIC_CACHE_TTL_SECONDS", 3600),
+		SemanticCacheSimilarityMinimum: getEnvFloat("SEMANTIC_CACHE_SIMILARITY_MIN", 0.92),
+		SemanticCacheEmbeddingModel:    getEnv("SEMANTIC_CACHE_EMBEDDING_MODEL", "text-embedding-3-small"),
 	}
 }
 
@@ -67,4 +79,40 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func getEnvInt(key string, fallback int) int {
+	value, ok := os.LookupEnv(key)
+	if !ok {
+		return fallback
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return n
+}
+
+func getEnvFloat(key string, fallback float64) float64 {
+	value, ok := os.LookupEnv(key)
+	if !ok {
+		return fallback
+	}
+	n, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return fallback
+	}
+	return n
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	value, ok := os.LookupEnv(key)
+	if !ok {
+		return fallback
+	}
+	b, err := strconv.ParseBool(value)
+	if err != nil {
+		return fallback
+	}
+	return b
 }

@@ -106,6 +106,7 @@ func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
 			Provider:        providerStr,
 			TokensProcessed: 0, // can be enriched later from response
 			PIIDetected:     fwdResult.PIIDetected,
+			SemanticCacheHit: fwdResult.SemanticCacheHit,
 			ScrubbedItems:   fwdResult.ScrubbedItems,
 			LatencyMs:       latencyMs,
 		}
