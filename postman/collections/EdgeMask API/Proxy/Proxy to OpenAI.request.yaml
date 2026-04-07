@@ -11,12 +11,11 @@ body:
   type: json
   content: >-
     {
-      "model": "gpt-5.4-mini",
-      "stream": false,
+      "model": "gpt-3.5-turbo",
       "messages": [
         {
           "role": "user",
-          "content": "Hello, my name is John Doe and my phone number is +90 552 332 24 05. Can you help me?"
+          "content": "Saas yazılımlar geliştirirken, GDPR ile HIPAA uyumluluklarının birbirinden ayrıldığı noktalar nelerdir."
         }
       ]
     }

@@ -239,10 +239,11 @@ func (s *proxyService) Forward(
 							respHeaders := make(http.Header)
 							respHeaders.Set("Content-Type", "application/json")
 							result := domain.ForwardResult{
-								StatusCode:    http.StatusOK,
-								PIIDetected:   sr.totalRedacted > 0,
-								ScrubbedItems: sr.scrubbedTypes,
-								RedactCount:   sr.totalRedacted,
+								StatusCode:       http.StatusOK,
+								PIIDetected:      sr.totalRedacted > 0,
+								ScrubbedItems:    sr.scrubbedTypes,
+								RedactCount:      sr.totalRedacted,
+								TokensProcessed:  extractTokensFromResponse(providerID, cached),
 								SemanticCacheHit: true,
 							}
 							return io.NopCloser(bytes.NewReader(cached)), respHeaders, result, nil
@@ -266,44 +267,48 @@ func (s *proxyService) Forward(
 	}
 
 	fwdResult := domain.ForwardResult{
-		StatusCode:    statusCode,
-		PIIDetected:   sr.totalRedacted > 0,
-		ScrubbedItems: sr.scrubbedTypes,
-		RedactCount:   sr.totalRedacted,
+		StatusCode:       statusCode,
+		PIIDetected:      sr.totalRedacted > 0,
+		ScrubbedItems:    sr.scrubbedTypes,
+		RedactCount:      sr.totalRedacted,
+		TokensProcessed:  0,
 		SemanticCacheHit: false,
 	}
 
-	if metaErr == nil && s.semanticEnabled && !meta.Stream && promptHash != "" &&
-		statusCode >= 200 && statusCode < 300 && s.semanticRepo != nil &&
-		s.semanticRespCache != nil && s.embeddingSvc != nil {
+	if metaErr == nil && !meta.Stream {
 		responseBytes, readErr := io.ReadAll(body)
 		if readErr != nil {
 			return nil, nil, domain.ForwardResult{StatusCode: http.StatusBadGateway}, fmt.Errorf("failed to read upstream body: %w", readErr)
 		}
 		_ = body.Close()
+		fwdResult.TokensProcessed = extractTokensFromResponse(providerID, responseBytes)
 
-		responseKey := shaHex(meta.PromptText + ":" + string(providerID) + ":" + meta.Model + ":" + string(responseBytes))
-		if err := s.semanticRespCache.Set(ctx, responseKey, responseBytes, s.semanticTTL); err != nil {
-			logger.Error("semantic redis set failed: ", err)
-		} else {
-			openaiKeyRecord, openaiErr := s.providerKeys.GetProviderKey(ctx, userID, domain.ProviderOpenAI)
-			if openaiErr == nil {
-				openaiPlainKey, decErr := s.encryption.Decrypt(openaiKeyRecord.EncryptedKey)
-				if decErr == nil {
-					embedding, embErr := s.embeddingSvc.Embed(ctx, meta.PromptText, openaiPlainKey)
-					if embErr == nil {
-						repoErr := s.semanticRepo.UpsertEntry(ctx, domain.SemanticCacheEntry{
-							UserID:      userID,
-							ProviderID:  providerID,
-							Model:       meta.Model,
-							PromptHash:  promptHash,
-							PromptText:  meta.PromptText,
-							Embedding:   embedding,
-							ResponseKey: responseKey,
-							ExpiresAt:   time.Now().Add(s.semanticTTL),
-						})
-						if repoErr != nil {
-							logger.Error("semantic postgres upsert failed: ", repoErr)
+		if s.semanticEnabled && promptHash != "" &&
+			statusCode >= 200 && statusCode < 300 && s.semanticRepo != nil &&
+			s.semanticRespCache != nil && s.embeddingSvc != nil {
+			responseKey := shaHex(meta.PromptText + ":" + string(providerID) + ":" + meta.Model + ":" + string(responseBytes))
+			if err := s.semanticRespCache.Set(ctx, responseKey, responseBytes, s.semanticTTL); err != nil {
+				logger.Error("semantic redis set failed: ", err)
+			} else {
+				openaiKeyRecord, openaiErr := s.providerKeys.GetProviderKey(ctx, userID, domain.ProviderOpenAI)
+				if openaiErr == nil {
+					openaiPlainKey, decErr := s.encryption.Decrypt(openaiKeyRecord.EncryptedKey)
+					if decErr == nil {
+						embedding, embErr := s.embeddingSvc.Embed(ctx, meta.PromptText, openaiPlainKey)
+						if embErr == nil {
+							repoErr := s.semanticRepo.UpsertEntry(ctx, domain.SemanticCacheEntry{
+								UserID:      userID,
+								ProviderID:  providerID,
+								Model:       meta.Model,
+								PromptHash:  promptHash,
+								PromptText:  meta.PromptText,
+								Embedding:   embedding,
+								ResponseKey: responseKey,
+								ExpiresAt:   time.Now().Add(s.semanticTTL),
+							})
+							if repoErr != nil {
+								logger.Error("semantic postgres upsert failed: ", repoErr)
+							}
 						}
 					}
 				}
@@ -319,5 +324,58 @@ func (s *proxyService) Forward(
 func shaHex(v string) string {
 	sum := sha256.Sum256([]byte(v))
 	return hex.EncodeToString(sum[:])
+}
+
+func extractTokensFromResponse(providerID domain.ProviderID, responseBody []byte) int {
+	switch providerID {
+	case domain.ProviderOpenAI:
+		return extractOpenAITokens(responseBody)
+	case domain.ProviderAnthropic:
+		return extractAnthropicTokens(responseBody)
+	case domain.ProviderGemini:
+		return extractGeminiTokens(responseBody)
+	default:
+		return 0
+	}
+}
+
+func extractOpenAITokens(responseBody []byte) int {
+	var resp struct {
+		Usage struct {
+			TotalTokens int `json:"total_tokens"`
+		} `json:"usage"`
+	}
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return 0
+	}
+	return resp.Usage.TotalTokens
+}
+
+func extractAnthropicTokens(responseBody []byte) int {
+	var resp struct {
+		Usage map[string]int `json:"usage"`
+	}
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return 0
+	}
+	total := 0
+	for _, v := range resp.Usage {
+		if v > 0 {
+			total += v
+		}
+	}
+	return total
+}
+
+func extractGeminiTokens(responseBody []byte) int {
+	var resp struct {
+		UsageMetadata struct {
+			TotalTokenCount int `json:"totalTokenCount"`
+		} `json:"usageMetadata"`
+	}
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return 0
+	}
+	return resp.UsageMetadata.TotalTokenCount
 }
 

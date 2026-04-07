@@ -102,7 +102,7 @@ func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
 			APIKeyPrefix:    apiKeyPrefix,
 			ModelUsed:       modelUsed,
 			Provider:        providerStr,
-			TokensProcessed: 0,
+			TokensProcessed: fwdResult.TokensProcessed,
 			PIIDetected:     fwdResult.PIIDetected,
 			SemanticCacheHit: fwdResult.SemanticCacheHit,
 			ScrubbedItems:   fwdResult.ScrubbedItems,

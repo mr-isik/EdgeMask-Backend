@@ -35,9 +35,10 @@ type RequestLogPage struct {
 // ForwardResult wraps the proxy response along with scrub metadata
 // needed for logging. This replaces the previous multi-return approach.
 type ForwardResult struct {
-	StatusCode    int
-	PIIDetected   bool
-	ScrubbedItems []string
-	RedactCount   int
+	StatusCode       int
+	PIIDetected      bool
+	ScrubbedItems    []string
+	RedactCount      int
+	TokensProcessed  int
 	SemanticCacheHit bool
 }
