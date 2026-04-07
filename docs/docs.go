@@ -654,6 +654,10 @@ const docTemplate = `{
         "handlers.AggregateStatsResp": {
             "type": "object",
             "properties": {
+                "semantic_cache_hit_rate": {
+                    "type": "number",
+                    "example": 0.66
+                },
                 "total_pii_redacted": {
                     "type": "integer",
                     "example": 3420
@@ -661,6 +665,14 @@ const docTemplate = `{
                 "total_requests": {
                     "type": "integer",
                     "example": 12450
+                },
+                "total_semantic_cache_hits": {
+                    "type": "integer",
+                    "example": 8200
+                },
+                "total_semantic_cache_misses": {
+                    "type": "integer",
+                    "example": 4250
                 },
                 "total_tokens_used": {
                     "type": "integer",
@@ -753,6 +765,10 @@ const docTemplate = `{
                         "CREDIT_CARD",
                         "EMAIL"
                     ]
+                },
+                "semantic_cache_hit": {
+                    "type": "boolean",
+                    "example": false
                 },
                 "timestamp": {
                     "type": "string",
@@ -900,6 +916,14 @@ const docTemplate = `{
                 "requests": {
                     "type": "integer",
                     "example": 150
+                },
+                "semantic_cache_hits": {
+                    "type": "integer",
+                    "example": 98
+                },
+                "semantic_cache_misses": {
+                    "type": "integer",
+                    "example": 52
                 },
                 "tokens_used": {
                     "type": "integer",

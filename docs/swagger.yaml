@@ -23,11 +23,20 @@ definitions:
     type: object
   handlers.AggregateStatsResp:
     properties:
+      semantic_cache_hit_rate:
+        example: 0.66
+        type: number
       total_pii_redacted:
         example: 3420
         type: integer
       total_requests:
         example: 12450
+        type: integer
+      total_semantic_cache_hits:
+        example: 8200
+        type: integer
+      total_semantic_cache_misses:
+        example: 4250
         type: integer
       total_tokens_used:
         example: 1250000
@@ -92,6 +101,9 @@ definitions:
         items:
           type: string
         type: array
+      semantic_cache_hit:
+        example: false
+        type: boolean
       timestamp:
         example: "2024-05-20T14:32:01Z"
         type: string
@@ -194,6 +206,12 @@ definitions:
         type: integer
       requests:
         example: 150
+        type: integer
+      semantic_cache_hits:
+        example: 98
+        type: integer
+      semantic_cache_misses:
+        example: 52
         type: integer
       tokens_used:
         example: 25000

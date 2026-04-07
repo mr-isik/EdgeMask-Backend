@@ -72,7 +72,6 @@ func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
 		})
 	}
 
-	// Extract model name from request body for logging (best-effort).
 	modelUsed := extractModel(rawBody)
 
 	headers := c.GetReqHeaders()
@@ -94,7 +93,6 @@ func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	}
-	// ── Async request log (only metadata, NEVER raw prompts) ───────────
 	latencyMs := int(time.Since(start).Milliseconds())
 	apiKeyPrefix, _ := c.Locals("api_key_prefix").(string)
 
@@ -104,7 +102,7 @@ func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
 			APIKeyPrefix:    apiKeyPrefix,
 			ModelUsed:       modelUsed,
 			Provider:        providerStr,
-			TokensProcessed: 0, // can be enriched later from response
+			TokensProcessed: 0,
 			PIIDetected:     fwdResult.PIIDetected,
 			SemanticCacheHit: fwdResult.SemanticCacheHit,
 			ScrubbedItems:   fwdResult.ScrubbedItems,
@@ -152,8 +150,6 @@ func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
 	return nil
 }
 
-// extractModel tries to read the "model" field from the JSON body.
-// Returns an empty string if parsing fails — this is best-effort.
 func extractModel(body []byte) string {
 	var partial struct {
 		Model string `json:"model"`
