@@ -1,2 +1,52 @@
 .postman/
 .postman/*
+
+.env
+
+# Build output
+/dist
+/build
+/bin
+/out
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go
+/go.sum
+/go.mod
+**/*.test
+*.test
+
+# IDE / Editor configs
+.vscode/
+.idea/
+*.swp
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+*.coverprofile
+
+# OS generated files
+ehthumbs.db
+Icon?
+._*
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Misc
+*.tmp
+*.bak
+.env
