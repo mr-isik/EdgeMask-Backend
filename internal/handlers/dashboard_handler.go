@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"errors"
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/mr-isik/edgemask-backend/internal/domain"
 	"github.com/mr-isik/edgemask-backend/pkg/logger"
@@ -11,6 +14,7 @@ type DashboardHandler struct {
 	keyRepo      domain.KeyRepository
 	providerRepo domain.ProviderKeyRepository
 	encryption   domain.EncryptionService
+	checkoutSvc  domain.CheckoutService
 }
 
 // NewDashboardHandler creates a new DashboardHandler and registers routes.
@@ -19,11 +23,13 @@ func NewDashboardHandler(
 	keyRepo domain.KeyRepository,
 	providerRepo domain.ProviderKeyRepository,
 	encryption domain.EncryptionService,
+	checkoutSvc domain.CheckoutService,
 ) {
 	h := &DashboardHandler{
 		keyRepo:      keyRepo,
 		providerRepo: providerRepo,
 		encryption:   encryption,
+		checkoutSvc:  checkoutSvc,
 	}
 
 	app.Get("/keys", h.ListKeys)
@@ -34,6 +40,143 @@ func NewDashboardHandler(
 	app.Post("/providers", h.SaveProviderKey)
 	app.Put("/providers", h.UpdateProviderKey)
 	app.Delete("/providers/:provider", h.DeleteProviderKey)
+	app.Post("/billing/checkout-session", h.CreateCheckoutSession)
+	app.Post("/billing/customer-portal-session", h.CreateCustomerPortalSession)
+}
+
+type createCheckoutSessionRequest struct {
+	ProductID     string `json:"product_id"`
+	Quantity      int    `json:"quantity"`
+	ReturnURL     string `json:"return_url"`
+	CancelURL     string `json:"cancel_url"`
+	CustomerEmail string `json:"customer_email"`
+	CustomerName  string `json:"customer_name"`
+}
+
+type createCustomerPortalSessionRequest struct {
+	ReturnURL string `json:"return_url"`
+	SendEmail bool   `json:"send_email"`
+}
+
+// CreateCheckoutSession godoc
+// @Summary      Create Dodo checkout session
+// @Description  Creates a Dodo Payments checkout session and returns redirect URL.
+// @Tags         Billing
+// @Accept       json
+// @Produce      json
+// @Param        body  body      CreateCheckoutSessionReq   true  "Checkout session request"
+// @Success      200   {object}  CreateCheckoutSessionResp
+// @Failure      400   {object}  ErrorResponse
+// @Failure      401   {object}  ErrorResponse
+// @Failure      500   {object}  ErrorResponse
+// @Security     SupabaseJWT
+// @Router       /api/billing/checkout-session [post]
+func (h *DashboardHandler) CreateCheckoutSession(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+
+	var req createCheckoutSessionRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+	}
+	if req.ProductID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "product_id is required"})
+	}
+	if req.Quantity <= 0 {
+		req.Quantity = 1
+	}
+	if h.checkoutSvc == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "checkout service unavailable"})
+	}
+
+	session, err := h.checkoutSvc.CreateSession(c.Context(), domain.CheckoutSessionRequest{
+		UserID:        userID,
+		ProductID:     req.ProductID,
+		Quantity:      req.Quantity,
+		ReturnURL:     req.ReturnURL,
+		CancelURL:     req.CancelURL,
+		CustomerEmail: req.CustomerEmail,
+		CustomerName:  req.CustomerName,
+	})
+	if err != nil {
+		logger.Error("Failed to create checkout session: ", err)
+		statusCode := checkoutErrorStatus(err)
+		return c.Status(statusCode).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"session_id":   session.SessionID,
+		"checkout_url": session.CheckoutURL,
+		"provider":     "dodopayments",
+	})
+}
+
+// CreateCustomerPortalSession godoc
+// @Summary      Create Dodo customer portal session
+// @Description  Creates a dynamic Dodo Payments customer portal link for the authenticated user.
+// @Tags         Billing
+// @Accept       json
+// @Produce      json
+// @Param        body  body      CreateCustomerPortalSessionReq   false  "Customer portal request"
+// @Success      200   {object}  CreateCustomerPortalSessionResp
+// @Failure      400   {object}  ErrorResponse
+// @Failure      401   {object}  ErrorResponse
+// @Failure      500   {object}  ErrorResponse
+// @Security     SupabaseJWT
+// @Router       /api/billing/customer-portal-session [post]
+func (h *DashboardHandler) CreateCustomerPortalSession(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	if h.checkoutSvc == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "checkout service unavailable"})
+	}
+
+	var req createCustomerPortalSessionRequest
+	if len(c.Body()) > 0 {
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+	}
+
+	session, err := h.checkoutSvc.CreateCustomerPortalSession(c.Context(), domain.CustomerPortalSessionRequest{
+		UserID:    userID,
+		ReturnURL: req.ReturnURL,
+		SendEmail: req.SendEmail,
+	})
+	if err != nil {
+		logger.Error("Failed to create customer portal session: ", err)
+		statusCode := checkoutErrorStatus(err)
+		return c.Status(statusCode).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"portal_url": session.Link,
+		"provider":   "dodopayments",
+	})
+}
+
+// checkoutErrorStatus maps service-layer errors to appropriate HTTP status codes.
+// Validation / missing-data errors → 400/422, infrastructure errors → 500.
+func checkoutErrorStatus(err error) int {
+	if errors.Is(err, domain.ErrBillingMappingNotFound) {
+		return fiber.StatusUnprocessableEntity // 422
+	}
+	msg := err.Error()
+	validationPhrases := []string{
+		"is required",
+		"api key is required",
+		"user id is required",
+		"customer_email is required",
+		"product_id is required",
+	}
+	for _, phrase := range validationPhrases {
+		if strings.Contains(msg, phrase) {
+			return fiber.StatusBadRequest // 400
+		}
+	}
+	return fiber.StatusInternalServerError // 500
 }
 
 // ListKeys godoc

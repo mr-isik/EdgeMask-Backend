@@ -42,6 +42,57 @@ definitions:
         example: 1250000
         type: integer
     type: object
+  handlers.CreateCheckoutSessionReq:
+    properties:
+      cancel_url:
+        example: https://app.edgemask.io/billing/cancel
+        type: string
+      customer_email:
+        example: customer@example.com
+        type: string
+      customer_name:
+        example: Jane Doe
+        type: string
+      product_id:
+        example: prod_abc123
+        type: string
+      quantity:
+        example: 1
+        type: integer
+      return_url:
+        example: https://app.edgemask.io/billing/success
+        type: string
+    type: object
+  handlers.CreateCheckoutSessionResp:
+    properties:
+      checkout_url:
+        example: https://checkout.dodopayments.com/session/...
+        type: string
+      provider:
+        example: dodopayments
+        type: string
+      session_id:
+        example: csn_abc123
+        type: string
+    type: object
+  handlers.CreateCustomerPortalSessionReq:
+    properties:
+      return_url:
+        example: https://app.edgemask.io/billing
+        type: string
+      send_email:
+        example: false
+        type: boolean
+    type: object
+  handlers.CreateCustomerPortalSessionResp:
+    properties:
+      portal_url:
+        example: https://customer.dodopayments.com/session/...
+        type: string
+      provider:
+        example: dodopayments
+        type: string
+    type: object
   handlers.CreateKeyReq:
     properties:
       name:
@@ -56,6 +107,28 @@ definitions:
       message:
         example: Save this key securely. It will NOT be shown again.
         type: string
+    type: object
+  handlers.DodoWebhookReq:
+    properties:
+      business_id:
+        example: biz_123
+        type: string
+      data: {}
+      timestamp:
+        example: "2026-04-09T12:00:00Z"
+        type: string
+      type:
+        example: subscription.active
+        type: string
+    type: object
+  handlers.DodoWebhookResp:
+    properties:
+      duplicate:
+        example: false
+        type: boolean
+      received:
+        example: true
+        type: boolean
     type: object
   handlers.ErrorResponse:
     properties:
@@ -233,6 +306,78 @@ info:
   title: EdgeMask API
   version: "1.0"
 paths:
+  /api/billing/checkout-session:
+    post:
+      consumes:
+      - application/json
+      description: Creates a Dodo Payments checkout session and returns redirect URL.
+      parameters:
+      - description: Checkout session request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateCheckoutSessionReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.CreateCheckoutSessionResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - SupabaseJWT: []
+      summary: Create Dodo checkout session
+      tags:
+      - Billing
+  /api/billing/customer-portal-session:
+    post:
+      consumes:
+      - application/json
+      description: Creates a dynamic Dodo Payments customer portal link for the authenticated
+        user.
+      parameters:
+      - description: Customer portal request
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/handlers.CreateCustomerPortalSessionReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.CreateCustomerPortalSessionResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - SupabaseJWT: []
+      summary: Create Dodo customer portal session
+      tags:
+      - Billing
   /api/keys:
     get:
       description: Returns all EdgeMask API keys for the authenticated user. Only
@@ -627,6 +772,55 @@ paths:
       summary: Proxy request to LLM provider
       tags:
       - Proxy
+  /webhooks/dodo:
+    post:
+      consumes:
+      - application/json
+      description: Verifies Svix signature headers and accepts Dodo webhook events.
+      parameters:
+      - description: Unique webhook delivery ID
+        in: header
+        name: webhook-id
+        required: true
+        type: string
+      - description: Svix signature header
+        in: header
+        name: webhook-signature
+        required: true
+        type: string
+      - description: Webhook timestamp (unix seconds or RFC3339)
+        in: header
+        name: webhook-timestamp
+        required: true
+        type: string
+      - description: Webhook payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.DodoWebhookReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.DodoWebhookResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Dodo Payments webhook receiver
+      tags:
+      - Billing
 securityDefinitions:
   EdgeMaskAPIKey:
     description: 'EdgeMask API Key. Format: `Bearer edgemask_live_...`'
@@ -648,3 +842,5 @@ tags:
   name: Provider Keys
 - description: Usage statistics and time-series analytics for the dashboard
   name: Analytics
+- description: Dodo Payments checkout and billing integration endpoints
+  name: Billing

@@ -24,6 +24,119 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/billing/checkout-session": {
+            "post": {
+                "security": [
+                    {
+                        "SupabaseJWT": []
+                    }
+                ],
+                "description": "Creates a Dodo Payments checkout session and returns redirect URL.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Billing"
+                ],
+                "summary": "Create Dodo checkout session",
+                "parameters": [
+                    {
+                        "description": "Checkout session request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateCheckoutSessionReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateCheckoutSessionResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/billing/customer-portal-session": {
+            "post": {
+                "security": [
+                    {
+                        "SupabaseJWT": []
+                    }
+                ],
+                "description": "Creates a dynamic Dodo Payments customer portal link for the authenticated user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Billing"
+                ],
+                "summary": "Create Dodo customer portal session",
+                "parameters": [
+                    {
+                        "description": "Customer portal request",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateCustomerPortalSessionReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateCustomerPortalSessionResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/keys": {
             "get": {
                 "security": [
@@ -619,6 +732,79 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/webhooks/dodo": {
+            "post": {
+                "description": "Verifies Svix signature headers and accepts Dodo webhook events.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Billing"
+                ],
+                "summary": "Dodo Payments webhook receiver",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique webhook delivery ID",
+                        "name": "webhook-id",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Svix signature header",
+                        "name": "webhook-signature",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Webhook timestamp (unix seconds or RFC3339)",
+                        "name": "webhook-timestamp",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Webhook payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DodoWebhookReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DodoWebhookResp"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -680,6 +866,78 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.CreateCheckoutSessionReq": {
+            "type": "object",
+            "properties": {
+                "cancel_url": {
+                    "type": "string",
+                    "example": "https://app.edgemask.io/billing/cancel"
+                },
+                "customer_email": {
+                    "type": "string",
+                    "example": "customer@example.com"
+                },
+                "customer_name": {
+                    "type": "string",
+                    "example": "Jane Doe"
+                },
+                "product_id": {
+                    "type": "string",
+                    "example": "prod_abc123"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "return_url": {
+                    "type": "string",
+                    "example": "https://app.edgemask.io/billing/success"
+                }
+            }
+        },
+        "handlers.CreateCheckoutSessionResp": {
+            "type": "object",
+            "properties": {
+                "checkout_url": {
+                    "type": "string",
+                    "example": "https://checkout.dodopayments.com/session/..."
+                },
+                "provider": {
+                    "type": "string",
+                    "example": "dodopayments"
+                },
+                "session_id": {
+                    "type": "string",
+                    "example": "csn_abc123"
+                }
+            }
+        },
+        "handlers.CreateCustomerPortalSessionReq": {
+            "type": "object",
+            "properties": {
+                "return_url": {
+                    "type": "string",
+                    "example": "https://app.edgemask.io/billing"
+                },
+                "send_email": {
+                    "type": "boolean",
+                    "example": false
+                }
+            }
+        },
+        "handlers.CreateCustomerPortalSessionResp": {
+            "type": "object",
+            "properties": {
+                "portal_url": {
+                    "type": "string",
+                    "example": "https://customer.dodopayments.com/session/..."
+                },
+                "provider": {
+                    "type": "string",
+                    "example": "dodopayments"
+                }
+            }
+        },
         "handlers.CreateKeyReq": {
             "type": "object",
             "properties": {
@@ -699,6 +957,37 @@ const docTemplate = `{
                 "message": {
                     "type": "string",
                     "example": "Save this key securely. It will NOT be shown again."
+                }
+            }
+        },
+        "handlers.DodoWebhookReq": {
+            "type": "object",
+            "properties": {
+                "business_id": {
+                    "type": "string",
+                    "example": "biz_123"
+                },
+                "data": {},
+                "timestamp": {
+                    "type": "string",
+                    "example": "2026-04-09T12:00:00Z"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "subscription.active"
+                }
+            }
+        },
+        "handlers.DodoWebhookResp": {
+            "type": "object",
+            "properties": {
+                "duplicate": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "received": {
+                    "type": "boolean",
+                    "example": true
                 }
             }
         },
@@ -962,6 +1251,10 @@ const docTemplate = `{
         {
             "description": "Usage statistics and time-series analytics for the dashboard",
             "name": "Analytics"
+        },
+        {
+            "description": "Dodo Payments checkout and billing integration endpoints",
+            "name": "Billing"
         }
     ]
 }`

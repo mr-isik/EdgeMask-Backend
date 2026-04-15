@@ -57,6 +57,9 @@ import (
 
 // @tag.name         Analytics
 // @tag.description  Usage statistics and time-series analytics for the dashboard
+//
+// @tag.name         Billing
+// @tag.description  Dodo Payments checkout and billing integration endpoints
 
 func main() {
 	cfg := config.LoadConfig()
@@ -89,6 +92,8 @@ func main() {
 	providerKeyRepo := pgRepo.NewProviderKeyRepository(db)
 	analyticsRepo := pgRepo.NewAnalyticsRepository(db)
 	requestLogRepo := pgRepo.NewRequestLogRepository(db)
+	userBillingRepo := pgRepo.NewUserBillingRepository(db)
+	webhookEventRepo := pgRepo.NewWebhookEventRepository(db)
 	keyCache := redisRepo.NewKeyCache(redisClient)
 	semanticRepo := pgRepo.NewSemanticCacheRepository(db)
 	semanticRespCache := redisRepo.NewSemanticResponseCache(redisClient)
@@ -103,6 +108,18 @@ func main() {
 	scrubbingSvc := services.NewScrubbingService()
 	authSvc := services.NewAuthService(keyRepo, keyCache)
 	embeddingSvc := services.NewEmbeddingService(cfg.OpenAIBaseURL, cfg.SemanticCacheEmbeddingModel)
+	billingSvc := services.NewBillingService(
+		cfg.DodoPaymentsEnabled,
+		cfg.DodoPaymentsAPIKey,
+		cfg.DodoPaymentsBaseURL,
+		cfg.DodoPaymentsEventName,
+		userBillingRepo,
+	)
+	checkoutSvc := services.NewCheckoutService(
+		cfg.DodoPaymentsAPIKey,
+		cfg.DodoPaymentsBaseURL,
+		userBillingRepo,
+	)
 
 	// ─── LLM Provider Adapters (stateless, BYOK) ──────────────
 	openai := providers.NewOpenAIAdapter(cfg.OpenAIBaseURL)
@@ -155,15 +172,23 @@ func main() {
 		})
 	})
 
+	// ─── Public Webhooks ───────────────────────────────────────
+	handlers.NewDodoWebhookHandler(
+		app,
+		cfg.DodoWebhookSecret,
+		time.Duration(cfg.DodoWebhookToleranceSeconds)*time.Second,
+		webhookEventRepo,
+	)
+
 	// ─── Routes: /v1/* (Proxy — edgemask_live_ key auth) ──────
 	v1 := app.Group("/v1")
 	v1.Use(handlers.AuthMiddleware(authSvc))
-	handlers.NewProxyHandler(v1, proxySvc, requestLogRepo)
+	handlers.NewProxyHandler(v1, proxySvc, requestLogRepo, billingSvc)
 
 	// ─── Routes: /api/* (Dashboard — Supabase JWT auth) ───────
 	api := app.Group("/api")
 	api.Use(handlers.DashboardMiddleware(cfg.SupabaseURL))
-	handlers.NewDashboardHandler(api, keyRepo, providerKeyRepo, encSvc)
+	handlers.NewDashboardHandler(api, keyRepo, providerKeyRepo, encSvc, checkoutSvc)
 	handlers.NewAnalyticsHandler(api, analyticsRepo)
 	handlers.NewLogHandler(api, requestLogRepo)
 
@@ -176,4 +201,3 @@ func main() {
 		logger.Error("Failed to start server: ", err)
 	}
 }
-
