@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -38,17 +39,19 @@ func NewProxyHandler(
 
 // HandleProxy godoc
 // @Summary      Proxy request to LLM provider
-// @Description  Scrubs PII from the request body, then forwards it to the selected LLM provider (openai, anthropic, gemini) using the customer's own API key. Supports streaming (SSE) responses.
+// @Description  Scrubs PII from the request body and forwards the request to the selected LLM provider. Zero-trust bypass: all headers (Authorization, custom headers, etc.) are forwarded as-is — pass your provider API key in Authorization. Only X-EdgeMask-Key is stripped before forwarding.
 // @Tags         Proxy
 // @Accept       json
 // @Produce      json
 // @Produce      text/event-stream
-// @Param        provider  path      string            true   "LLM provider"  Enums(openai, anthropic, gemini)
-// @Param        body      body      ProxyReq     true   "OpenAI-compatible chat completion request"
-// @Success      200       {string}  string       "Proxied response (may be SSE stream)"
-// @Failure      400       {object}  ErrorResponse
-// @Failure      401       {object}  ErrorResponse
-// @Failure      502       {object}  ErrorResponse
+// @Param        provider        path      string    true   "LLM provider"  Enums(openai, anthropic, gemini)
+// @Param        X-EdgeMask-Key  header    string    true   "EdgeMask API key (edgemask_live_...)"
+// @Param        Authorization   header    string    false  "Provider API key forwarded directly to upstream (e.g. Bearer sk-...)"
+// @Param        body            body      ProxyReq  true   "OpenAI-compatible chat completion request"
+// @Success      200             {string}  string    "Proxied response (may be SSE stream)"
+// @Failure      400             {object}  ErrorResponse
+// @Failure      401             {object}  ErrorResponse
+// @Failure      502             {object}  ErrorResponse
 // @Security     EdgeMaskAPIKey
 // @Router       /v1/proxy/{provider} [post]
 func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
@@ -81,9 +84,13 @@ func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
 
 	modelUsed := extractModel(rawBody)
 
-	headers := c.GetReqHeaders()
+	// Build forwarded headers: copy all incoming headers, strip only X-EdgeMask-Key
+	// so it does not leak to the upstream provider.
 	reqHeaders := make(map[string][]string)
-	for k, v := range headers {
+	for k, v := range c.GetReqHeaders() {
+		if strings.EqualFold(k, "X-EdgeMask-Key") {
+			continue
+		}
 		reqHeaders[k] = v
 	}
 
@@ -146,7 +153,7 @@ func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
 
 	c.Status(fwdResult.StatusCode)
 	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
-		defer body.Close() // Ensure body is closed when stream writer finishes
+		defer body.Close()
 		buf := make([]byte, 4096)
 		for {
 			n, readErr := body.Read(buf)

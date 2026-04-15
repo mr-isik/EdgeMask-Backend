@@ -19,13 +19,7 @@ type KeyRepository interface {
 	RevokeKey(ctx context.Context, userID string, keyID string) error
 }
 
-// ProviderKeyRepository handles storage/retrieval of customer-owned LLM provider keys.
-type ProviderKeyRepository interface {
-	GetProviderKey(ctx context.Context, userID string, provider ProviderID) (*CustomerProviderKey, error)
-	ListProviderKeys(ctx context.Context, userID string) ([]CustomerProviderKey, error)
-	SaveProviderKey(ctx context.Context, userID string, provider ProviderID, encryptedKey string, keyHint string) error
-	DeleteProviderKey(ctx context.Context, userID string, provider ProviderID) error
-}
+
 
 // AnalyticsRepository handles usage logging and aggregation.
 type AnalyticsRepository interface {
@@ -73,10 +67,7 @@ type AuthService interface {
 	ValidateKey(ctx context.Context, rawKey string) (*KeyLookupResult, error)
 }
 
-type EncryptionService interface {
-	Encrypt(plaintext string) (string, error)
-	Decrypt(ciphertext string) (string, error)
-}
+
 
 type ScrubbingService interface {
 	Redact(text string) ScrubbingResult
@@ -87,6 +78,7 @@ type ProxyService interface {
 }
 
 // EmbeddingService converts a text prompt into a float embedding vector.
+// Zero-trust: the API key is passed per-request from the caller's Authorization header.
 type EmbeddingService interface {
 	Embed(ctx context.Context, text string, apiKey string) ([]float32, error)
 }

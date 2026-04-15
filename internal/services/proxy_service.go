@@ -31,11 +31,10 @@ type scrubResult struct {
 }
 
 // proxyService implements domain.ProxyService.
-// Orchestrates: fetch customer key → scrub PII → select provider → forward.
+// Zero-trust bypass: no API keys stored or fetched. All headers flow through as-is.
+// Only X-EdgeMask-Key is stripped by the handler before arriving here.
 type proxyService struct {
 	scrubber           domain.ScrubbingService
-	encryption         domain.EncryptionService
-	providerKeys       domain.ProviderKeyRepository
 	providers          map[domain.ProviderID]domain.LLMProvider
 	semanticEnabled    bool
 	semanticTTL        time.Duration
@@ -45,11 +44,9 @@ type proxyService struct {
 	embeddingSvc       domain.EmbeddingService
 }
 
-// NewProxyService creates a new ProxyService with the given dependencies.
+// NewProxyService creates a new ProxyService.
 func NewProxyService(
 	scrubber domain.ScrubbingService,
-	encryption domain.EncryptionService,
-	providerKeys domain.ProviderKeyRepository,
 	semanticEnabled bool,
 	semanticTTL time.Duration,
 	semanticSimilarity float64,
@@ -66,8 +63,6 @@ func NewProxyService(
 
 	return &proxyService{
 		scrubber:           scrubber,
-		encryption:         encryption,
-		providerKeys:       providerKeys,
 		providers:          pm,
 		semanticEnabled:    semanticEnabled,
 		semanticTTL:        semanticTTL,
@@ -108,10 +103,8 @@ func extractRequestMetadata(rawBody []byte) (*requestMetadata, error) {
 }
 
 // scrubMessages performs surgical PII redaction on ONLY the messages[].content
-// fields of the raw JSON body. All other fields (model, temperature, etc.) are
-// preserved byte-for-byte via json.RawMessage.
+// fields of the raw JSON body. All other fields are preserved byte-for-byte.
 func (s *proxyService) scrubMessages(rawBody []byte) (*scrubResult, error) {
-	// Pass 1: Unmarshal top-level keys into a map to preserve unknown fields.
 	var top map[string]json.RawMessage
 	if err := json.Unmarshal(rawBody, &top); err != nil {
 		return nil, fmt.Errorf("failed to parse request JSON: %w", err)
@@ -119,17 +112,14 @@ func (s *proxyService) scrubMessages(rawBody []byte) (*scrubResult, error) {
 
 	msgsRaw, ok := top["messages"]
 	if !ok {
-		// No messages array — nothing to scrub (e.g. embeddings request).
 		return &scrubResult{body: rawBody}, nil
 	}
 
-	// Pass 2: Unmarshal only the messages array.
 	var msgs []chatMessage
 	if err := json.Unmarshal(msgsRaw, &msgs); err != nil {
 		return nil, fmt.Errorf("failed to parse messages array: %w", err)
 	}
 
-	// Scrub only the content field of each message, collecting PII types.
 	totalRedacted := 0
 	seen := make(map[string]struct{})
 	var allTypes []string
@@ -149,11 +139,9 @@ func (s *proxyService) scrubMessages(rawBody []byte) (*scrubResult, error) {
 	}
 
 	if totalRedacted == 0 {
-		// Nothing was redacted — return the original body untouched.
 		return &scrubResult{body: rawBody}, nil
 	}
 
-	// Re-marshal the scrubbed messages and put them back.
 	scrubbedMsgs, err := json.Marshal(msgs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to re-marshal scrubbed messages: %w", err)
@@ -172,8 +160,22 @@ func (s *proxyService) scrubMessages(rawBody []byte) (*scrubResult, error) {
 	}, nil
 }
 
-// Forward fetches the customer's decrypted provider key, scrubs PII from the
-// request body, selects the correct LLM provider, and forwards the request.
+// extractBearerKey extracts the raw token from an Authorization: Bearer <token> header.
+func extractBearerKey(headers http.Header) string {
+	auth := headers.Get("Authorization")
+	if auth == "" {
+		return ""
+	}
+	parts := strings.SplitN(auth, " ", 2)
+	if len(parts) == 2 && strings.EqualFold(parts[0], "bearer") {
+		return strings.TrimSpace(parts[1])
+	}
+	return strings.TrimSpace(auth)
+}
+
+// Forward scrubs PII from the request body, runs semantic cache lookup,
+// and forwards the request to the provider using the caller's own headers.
+// Zero-trust bypass: all headers (minus X-EdgeMask-Key) flow through unmodified.
 func (s *proxyService) Forward(
 	ctx context.Context,
 	userID string,
@@ -190,73 +192,56 @@ func (s *proxyService) Forward(
 		return nil, nil, domain.ForwardResult{StatusCode: http.StatusBadRequest}, fmt.Errorf("%w: %s", domain.ErrProviderUnknown, providerID)
 	}
 
-	// 2. Fetch the customer's encrypted provider key from DB
-	keyRecord, err := s.providerKeys.GetProviderKey(ctx, userID, providerID)
-	if err != nil {
-		return nil, nil, domain.ForwardResult{StatusCode: http.StatusBadRequest}, fmt.Errorf("%w", domain.ErrProviderKeyMissing)
-	}
-
-	// 3. Decrypt the key (only at the moment of use)
-	decryptedKey, err := s.encryption.Decrypt(keyRecord.EncryptedKey)
-	if err != nil {
-		logger.Error("Failed to decrypt provider key for user ", userID, ": ", err)
-		return nil, nil, domain.ForwardResult{StatusCode: http.StatusInternalServerError}, fmt.Errorf("failed to decrypt provider key")
-	}
-
-	// 4. Scrub PII from ONLY the messages[].content fields (surgical mutation)
+	// 2. Scrub PII from ONLY the messages[].content fields
 	sr, scrubErr := s.scrubMessages(rawBody)
 	if scrubErr != nil {
 		logger.Error("Failed to scrub request body: ", scrubErr)
 		return nil, nil, domain.ForwardResult{StatusCode: http.StatusBadRequest}, fmt.Errorf("failed to scrub request body: %w", scrubErr)
 	}
 
-	// 5. Semantic cache lookup (disabled for streaming requests)
+	// 3. Semantic cache lookup — uses the caller's Authorization key for embedding
+	// The key is extracted from headers at runtime; never stored.
 	var promptHash string
+	apiKey := extractBearerKey(headers)
 	meta, metaErr := extractRequestMetadata(sr.body)
 	if metaErr == nil && s.semanticEnabled && !meta.Stream && meta.Model != "" && meta.PromptText != "" &&
-		s.semanticRepo != nil && s.semanticRespCache != nil && s.embeddingSvc != nil {
-		openaiKeyRecord, openaiErr := s.providerKeys.GetProviderKey(ctx, userID, domain.ProviderOpenAI)
-		if openaiErr == nil {
-			openaiPlainKey, decErr := s.encryption.Decrypt(openaiKeyRecord.EncryptedKey)
-			if decErr == nil {
-				embedding, embErr := s.embeddingSvc.Embed(ctx, meta.PromptText, openaiPlainKey)
-				if embErr == nil && len(embedding) > 0 {
-					maxDistance := 1.0 - s.semanticSimilarity
-					if maxDistance < 0 {
-						maxDistance = 0
+		s.semanticRepo != nil && s.semanticRespCache != nil && s.embeddingSvc != nil && apiKey != "" {
+		embedding, embErr := s.embeddingSvc.Embed(ctx, meta.PromptText, apiKey)
+		if embErr == nil && len(embedding) > 0 {
+			maxDistance := 1.0 - s.semanticSimilarity
+			if maxDistance < 0 {
+				maxDistance = 0
+			}
+			hit, hitErr := s.semanticRepo.FindNearest(ctx, domain.SemanticLookupRequest{
+				UserID:      userID,
+				ProviderID:  providerID,
+				Model:       meta.Model,
+				Embedding:   embedding,
+				MaxDistance: maxDistance,
+				Now:         time.Now(),
+			})
+			if hitErr == nil && hit != nil {
+				cached, cacheErr := s.semanticRespCache.Get(ctx, hit.ResponseKey)
+				if cacheErr == nil && len(cached) > 0 {
+					respHeaders := make(http.Header)
+					respHeaders.Set("Content-Type", "application/json")
+					result := domain.ForwardResult{
+						StatusCode:       http.StatusOK,
+						PIIDetected:      sr.totalRedacted > 0,
+						ScrubbedItems:    sr.scrubbedTypes,
+						RedactCount:      sr.totalRedacted,
+						TokensProcessed:  extractTokensFromResponse(providerID, cached),
+						SemanticCacheHit: true,
 					}
-					hit, hitErr := s.semanticRepo.FindNearest(ctx, domain.SemanticLookupRequest{
-						UserID:      userID,
-						ProviderID:  providerID,
-						Model:       meta.Model,
-						Embedding:   embedding,
-						MaxDistance: maxDistance,
-						Now:         time.Now(),
-					})
-					if hitErr == nil && hit != nil {
-						cached, cacheErr := s.semanticRespCache.Get(ctx, hit.ResponseKey)
-						if cacheErr == nil && len(cached) > 0 {
-							respHeaders := make(http.Header)
-							respHeaders.Set("Content-Type", "application/json")
-							result := domain.ForwardResult{
-								StatusCode:       http.StatusOK,
-								PIIDetected:      sr.totalRedacted > 0,
-								ScrubbedItems:    sr.scrubbedTypes,
-								RedactCount:      sr.totalRedacted,
-								TokensProcessed:  extractTokensFromResponse(providerID, cached),
-								SemanticCacheHit: true,
-							}
-							return io.NopCloser(bytes.NewReader(cached)), respHeaders, result, nil
-						}
-					}
-					promptHash = shaHex(meta.PromptText)
+					return io.NopCloser(bytes.NewReader(cached)), respHeaders, result, nil
 				}
 			}
+			promptHash = shaHex(meta.PromptText)
 		}
 	}
 
-	// 6. Forward to provider with the customer's key
-	body, respHeaders, statusCode, err := provider.Forward(ctx, sr.body, decryptedKey, headers)
+	// 4. Forward to provider — all headers passed through, provider handles auth
+	body, respHeaders, statusCode, err := provider.Forward(ctx, sr.body, headers)
 	if err != nil {
 		logger.Error("Provider error [", string(providerID), "]: ", err)
 		if statusCode == 0 {
@@ -283,33 +268,28 @@ func (s *proxyService) Forward(
 		_ = body.Close()
 		fwdResult.TokensProcessed = extractTokensFromResponse(providerID, responseBytes)
 
+		// 5. Store in semantic cache after a successful non-streaming response
 		if s.semanticEnabled && promptHash != "" &&
 			statusCode >= 200 && statusCode < 300 && s.semanticRepo != nil &&
-			s.semanticRespCache != nil && s.embeddingSvc != nil {
+			s.semanticRespCache != nil && s.embeddingSvc != nil && apiKey != "" {
 			responseKey := shaHex(meta.PromptText + ":" + string(providerID) + ":" + meta.Model + ":" + string(responseBytes))
 			if err := s.semanticRespCache.Set(ctx, responseKey, responseBytes, s.semanticTTL); err != nil {
 				logger.Error("semantic redis set failed: ", err)
 			} else {
-				openaiKeyRecord, openaiErr := s.providerKeys.GetProviderKey(ctx, userID, domain.ProviderOpenAI)
-				if openaiErr == nil {
-					openaiPlainKey, decErr := s.encryption.Decrypt(openaiKeyRecord.EncryptedKey)
-					if decErr == nil {
-						embedding, embErr := s.embeddingSvc.Embed(ctx, meta.PromptText, openaiPlainKey)
-						if embErr == nil {
-							repoErr := s.semanticRepo.UpsertEntry(ctx, domain.SemanticCacheEntry{
-								UserID:      userID,
-								ProviderID:  providerID,
-								Model:       meta.Model,
-								PromptHash:  promptHash,
-								PromptText:  meta.PromptText,
-								Embedding:   embedding,
-								ResponseKey: responseKey,
-								ExpiresAt:   time.Now().Add(s.semanticTTL),
-							})
-							if repoErr != nil {
-								logger.Error("semantic postgres upsert failed: ", repoErr)
-							}
-						}
+				embedding, embErr := s.embeddingSvc.Embed(ctx, meta.PromptText, apiKey)
+				if embErr == nil {
+					repoErr := s.semanticRepo.UpsertEntry(ctx, domain.SemanticCacheEntry{
+						UserID:      userID,
+						ProviderID:  providerID,
+						Model:       meta.Model,
+						PromptHash:  promptHash,
+						PromptText:  meta.PromptText,
+						Embedding:   embedding,
+						ResponseKey: responseKey,
+						ExpiresAt:   time.Now().Add(s.semanticTTL),
+					})
+					if repoErr != nil {
+						logger.Error("semantic postgres upsert failed: ", repoErr)
 					}
 				}
 			}
@@ -378,4 +358,3 @@ func extractGeminiTokens(responseBody []byte) int {
 	}
 	return resp.UsageMetadata.TotalTokenCount
 }
-

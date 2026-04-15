@@ -7,13 +7,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/mr-isik/edgemask-backend/internal/domain"
 )
 
 // geminiAdapter implements domain.LLMProvider for Google's Gemini API.
-// Stateless — does NOT hold any API key. Key is injected per-request (BYOK).
+// Zero-trust bypass: headers are forwarded as-is.
+// Gemini uses ?key= query param — extracted from the Authorization header.
 type geminiAdapter struct {
 	baseURL string
 	client  *http.Client
@@ -94,9 +96,19 @@ func translateOpenAIToGemini(body []byte) ([]byte, string, bool, error) {
 	return data, oReq.Model, oReq.Stream, err
 }
 
+// extractBearerToken extracts the raw token from an "Authorization: Bearer <token>" header value.
+func extractBearerToken(authHeader string) string {
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) == 2 && strings.EqualFold(parts[0], "bearer") {
+		return strings.TrimSpace(parts[1])
+	}
+	return strings.TrimSpace(authHeader)
+}
+
 // Forward sends the scrubbed body to Google's Gemini generateContent endpoint.
-// apiKey is the customer's own Gemini key, decrypted at request time.
-func (a *geminiAdapter) Forward(ctx context.Context, scrubbedBody []byte, apiKey string, headers http.Header) (io.ReadCloser, http.Header, int, error) {
+// Gemini requires the API key as a ?key= query param; it is extracted from the
+// caller's Authorization header (Bearer <gemini-key>) — never stored by EdgeMask.
+func (a *geminiAdapter) Forward(ctx context.Context, scrubbedBody []byte, headers http.Header) (io.ReadCloser, http.Header, int, error) {
 	translatedBody, model, stream, err := translateOpenAIToGemini(scrubbedBody)
 	if err != nil {
 		return nil, nil, http.StatusBadRequest, err
@@ -111,19 +123,29 @@ func (a *geminiAdapter) Forward(ctx context.Context, scrubbedBody []byte, apiKey
 		action = "streamGenerateContent"
 	}
 
-	// Inject customer's API key as query param (Google's convention)
-	url := fmt.Sprintf("%s/v1beta/models/%s:%s?key=%s", a.baseURL, model, action, apiKey)
+	// Gemini auth: extract key from Authorization header (Bearer <key>)
+	apiKey := extractBearerToken(headers.Get("Authorization"))
+	url := fmt.Sprintf("%s/v1beta/models/%s:%s", a.baseURL, model, action)
+	if apiKey != "" {
+		url += "?key=" + apiKey
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(translatedBody))
 	if err != nil {
 		return nil, nil, 0, fmt.Errorf("gemini: failed to create request: %w", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-
-	if accept := headers.Get("Accept"); accept != "" {
-		req.Header.Set("Accept", accept)
+	// Copy all incoming headers — pure bypass (Authorization itself is harmless for Gemini)
+	for key, values := range headers {
+		lower := strings.ToLower(key)
+		if lower == "x-edgemask-key" || lower == "host" || lower == "content-length" {
+			continue
+		}
+		for _, v := range values {
+			req.Header.Add(key, v)
+		}
 	}
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := a.client.Do(req)
 	if err != nil {

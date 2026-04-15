@@ -23,7 +23,7 @@ import (
 
 // @title           EdgeMask API
 // @version         1.0
-// @description     High-Performance B2B AI Proxy with PII Redaction. EdgeMask intercepts LLM API requests, scrubs PII data, and forwards them to OpenAI, Anthropic, or Gemini using customer-provided API keys (BYOK model).
+// @description     High-Performance B2B AI Proxy with PII Redaction. Zero-trust BYOK architecture: EdgeMask intercepts LLM API requests, scrubs PII data, and forwards them to OpenAI, Anthropic, or Gemini. Provider API keys are passed per-request via the Authorization header and are never stored.
 // @termsOfService  https://edgemask.io/terms
 
 // @contact.name   EdgeMask Support
@@ -47,13 +47,10 @@ import (
 // @description                 Supabase JWT token for dashboard access. Format: `Bearer <jwt_token>`
 
 // @tag.name         Proxy
-// @tag.description  AI Proxy endpoints — forward requests to LLM providers with PII redaction
+// @tag.description  AI Proxy endpoints — forward requests to LLM providers with PII redaction (zero-trust BYOK)
 
 // @tag.name         Key Management
 // @tag.description  Manage EdgeMask API keys (edgemask_live_...)
-
-// @tag.name         Provider Keys
-// @tag.description  Manage customer-owned LLM provider API keys (BYOK)
 
 // @tag.name         Analytics
 // @tag.description  Usage statistics and time-series analytics for the dashboard
@@ -89,7 +86,6 @@ func main() {
 
 	// ─── Repositories ──────────────────────────────────────────
 	keyRepo := pgRepo.NewKeyRepository(db)
-	providerKeyRepo := pgRepo.NewProviderKeyRepository(db)
 	analyticsRepo := pgRepo.NewAnalyticsRepository(db)
 	requestLogRepo := pgRepo.NewRequestLogRepository(db)
 	userBillingRepo := pgRepo.NewUserBillingRepository(db)
@@ -99,14 +95,9 @@ func main() {
 	semanticRespCache := redisRepo.NewSemanticResponseCache(redisClient)
 
 	// ─── Services ──────────────────────────────────────────────
-	encSvc, err := services.NewEncryptionService(cfg.MasterKey)
-	if err != nil {
-		logger.Error("Failed to initialize encryption service: ", err)
-		panic(err)
-	}
-
 	scrubbingSvc := services.NewScrubbingService()
 	authSvc := services.NewAuthService(keyRepo, keyCache)
+	// Zero-trust: no encryption service needed for provider keys
 	embeddingSvc := services.NewEmbeddingService(cfg.OpenAIBaseURL, cfg.SemanticCacheEmbeddingModel)
 	billingSvc := services.NewBillingService(
 		cfg.DodoPaymentsEnabled,
@@ -121,15 +112,13 @@ func main() {
 		userBillingRepo,
 	)
 
-	// ─── LLM Provider Adapters (stateless, BYOK) ──────────────
+	// ─── LLM Provider Adapters (stateless, zero-trust BYOK) ───
 	openai := providers.NewOpenAIAdapter(cfg.OpenAIBaseURL)
 	anthropic := providers.NewAnthropicAdapter(cfg.AnthropicBaseURL)
 	gemini := providers.NewGeminiAdapter(cfg.GeminiBaseURL)
 
 	proxySvc := services.NewProxyService(
 		scrubbingSvc,
-		encSvc,
-		providerKeyRepo,
 		cfg.SemanticCacheEnabled,
 		time.Duration(cfg.SemanticCacheTTLSeconds)*time.Second,
 		cfg.SemanticCacheSimilarityMinimum,
@@ -188,7 +177,7 @@ func main() {
 	// ─── Routes: /api/* (Dashboard — Supabase JWT auth) ───────
 	api := app.Group("/api")
 	api.Use(handlers.DashboardMiddleware(cfg.SupabaseURL))
-	handlers.NewDashboardHandler(api, keyRepo, providerKeyRepo, encSvc, checkoutSvc)
+	handlers.NewDashboardHandler(api, keyRepo, checkoutSvc)
 	handlers.NewAnalyticsHandler(api, analyticsRepo)
 	handlers.NewLogHandler(api, requestLogRepo)
 

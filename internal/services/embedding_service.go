@@ -12,6 +12,8 @@ import (
 	"github.com/mr-isik/edgemask-backend/internal/domain"
 )
 
+// embeddingService calls the OpenAI embeddings API.
+// Zero-trust: no API key is stored — the caller provides the key per request.
 type embeddingService struct {
 	client   *http.Client
 	baseURL  string
@@ -19,6 +21,7 @@ type embeddingService struct {
 	endpoint string
 }
 
+// NewEmbeddingService creates an EmbeddingService. No API key is stored.
 func NewEmbeddingService(baseURL string, model string) domain.EmbeddingService {
 	trimmed := strings.TrimRight(baseURL, "/")
 	return &embeddingService{
@@ -40,6 +43,8 @@ type embeddingResponse struct {
 	} `json:"data"`
 }
 
+// Embed generates an embedding vector for the given text.
+// The apiKey is the caller's provider key, forwarded directly — never stored.
 func (s *embeddingService) Embed(ctx context.Context, text string, apiKey string) ([]float32, error) {
 	body, err := json.Marshal(embeddingRequest{
 		Model: s.model,

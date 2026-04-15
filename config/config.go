@@ -23,7 +23,6 @@ type Config struct {
 
 	// Security
 	APIKeySecret string // Used for HMAC hashing of EdgeMask API keys
-	MasterKey    string // 32-byte key for AES-256-GCM encryption of customer provider keys
 
 	// Supabase
 	SupabaseURL            string // Supabase project URL (e.g. https://xxx.supabase.co)
@@ -31,7 +30,7 @@ type Config struct {
 	SupabaseServiceRoleKey string // Server-side API key (service_role) — NEVER expose in client code
 	SupabaseJWTSecret      string // JWT signing secret for verifying Supabase tokens
 
-	// LLM Provider Base URLs (keys come from customer DB, NOT env)
+	// LLM Provider Base URLs (zero-trust BYOK — keys come from request headers, NOT stored)
 	OpenAIBaseURL    string
 	AnthropicBaseURL string
 	GeminiBaseURL    string
@@ -64,7 +63,6 @@ func LoadConfig() *Config {
 		RedisURL:      getEnv("REDIS_URL", "localhost:6379"),
 		RedisPassword: getEnv("REDIS_PASSWORD", ""),
 		APIKeySecret:  getEnv("API_KEY_SECRET", ""),
-		MasterKey:     getEnv("MASTER_KEY", ""),
 
 		SupabaseURL:            getEnv("SUPABASE_URL", ""),
 		SupabaseAnonKey:        getEnv("SUPABASE_ANON_KEY", ""),

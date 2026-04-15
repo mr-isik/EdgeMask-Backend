@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/mr-isik/edgemask-backend/internal/domain"
 )
 
 // anthropicAdapter implements domain.LLMProvider for the Anthropic API.
-// Stateless — does NOT hold any API key. Key is injected per-request (BYOK).
+// Zero-trust bypass: headers are forwarded as-is. No key injection.
 type anthropicAdapter struct {
 	baseURL string
 	client  *http.Client
@@ -102,8 +103,9 @@ func translateOpenAIToAnthropic(body []byte) ([]byte, error) {
 }
 
 // Forward sends the scrubbed body to Anthropic's /v1/messages endpoint.
-// apiKey is the customer's own Anthropic key, decrypted at request time.
-func (a *anthropicAdapter) Forward(ctx context.Context, scrubbedBody []byte, apiKey string, headers http.Header) (io.ReadCloser, http.Header, int, error) {
+// All incoming headers are forwarded as-is (user sends x-api-key themselves).
+// anthropic-version is set as a default if not already present.
+func (a *anthropicAdapter) Forward(ctx context.Context, scrubbedBody []byte, headers http.Header) (io.ReadCloser, http.Header, int, error) {
 	translatedBody, err := translateOpenAIToAnthropic(scrubbedBody)
 	if err != nil {
 		return nil, nil, http.StatusBadRequest, err
@@ -116,13 +118,20 @@ func (a *anthropicAdapter) Forward(ctx context.Context, scrubbedBody []byte, api
 		return nil, nil, 0, fmt.Errorf("anthropic: failed to create request: %w", err)
 	}
 
-	// Inject customer's API key via Anthropic's header convention
+	// Copy all incoming headers — pure bypass
+	for key, values := range headers {
+		lower := strings.ToLower(key)
+		if lower == "x-edgemask-key" || lower == "host" || lower == "content-length" {
+			continue
+		}
+		for _, v := range values {
+			req.Header.Add(key, v)
+		}
+	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", apiKey)
-	req.Header.Set("anthropic-version", "2023-06-01")
-
-	if accept := headers.Get("Accept"); accept != "" {
-		req.Header.Set("Accept", accept)
+	// Set the required Anthropic version header if not already provided by the caller
+	if req.Header.Get("anthropic-version") == "" {
+		req.Header.Set("anthropic-version", "2023-06-01")
 	}
 
 	resp, err := a.client.Do(req)

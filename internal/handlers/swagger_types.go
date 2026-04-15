@@ -41,31 +41,6 @@ type CreateKeyResp struct {
 	Message string `json:"message" example:"Save this key securely. It will NOT be shown again."`
 }
 
-// SaveProviderKeyReq is the swagger request body for POST /api/providers.
-type SaveProviderKeyReq struct {
-	Provider string `json:"provider" example:"openai" enums:"openai,anthropic,gemini"`
-	APIKey   string `json:"api_key" example:"sk-proj-abc123..."`
-}
-
-// SaveProviderKeyResp is the swagger response for POST /api/providers.
-type SaveProviderKeyResp struct {
-	Message  string `json:"message" example:"provider key saved successfully"`
-	Provider string `json:"provider" example:"openai"`
-	Hint     string `json:"hint" example:"sk-p...c123"`
-}
-
-// ListProviderKeysResp is the swagger response for GET /api/providers.
-type ListProviderKeysResp struct {
-	Providers []ProviderKeyDoc `json:"providers"`
-}
-
-// ProviderKeyDoc represents a single provider key in the GET response.
-type ProviderKeyDoc struct {
-	Provider  string `json:"provider" example:"openai"`
-	KeyHint   string `json:"key_hint" example:"sk-...c123"`
-	UpdatedAt string `json:"updated_at" example:"2026-04-01T12:00:00Z"`
-}
-
 // AggregateStatsResp is the swagger response for GET /api/stats.
 type AggregateStatsResp struct {
 	TotalRequests            int64   `json:"total_requests" example:"12450"`

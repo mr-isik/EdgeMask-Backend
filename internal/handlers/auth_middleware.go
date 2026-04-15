@@ -9,27 +9,17 @@ import (
 	"github.com/mr-isik/edgemask-backend/internal/domain"
 )
 
-// AuthMiddleware validates the Authorization: Bearer <edgemask_live_...> key
-// using the AuthService before the request reaches the handler.
-// On success, it stores the KeyLookupResult in Fiber's Locals for downstream use.
+// AuthMiddleware validates the EdgeMask API key provided in the X-EdgeMask-Key header.
+// The Authorization header is left untouched so the user's provider API key
+// (e.g. OpenAI, Anthropic, Gemini) can be forwarded transparently.
 func AuthMiddleware(authService domain.AuthService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		authHeader := c.Get("Authorization")
-		if authHeader == "" {
+		rawKey := strings.TrimSpace(c.Get("X-EdgeMask-Key"))
+		if rawKey == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "missing Authorization header",
+				"error": "missing X-EdgeMask-Key header",
 			})
 		}
-
-		// Extract Bearer token
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "invalid Authorization format, expected: Bearer <key>",
-			})
-		}
-
-		rawKey := parts[1]
 
 		// Validate prefix
 		if !strings.HasPrefix(rawKey, domain.APIKeyPrefix) {
