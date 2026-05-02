@@ -50,7 +50,7 @@ func DefaultScrubbingRules() []ScrubbingRule {
 		{Name: "SSN", Pattern: `\b\d{3}[\s\-]?\d{2}[\s\-]?\d{4}\b`, Replacement: "[REDACTED_SSN]", IsEnabled: true},
 		{Name: "DATE_OF_BIRTH", Pattern: `\b(?:0[1-9]|1[0-2])[\s/\-\.](0[1-9]|[12]\d|3[01])[\s/\-\.](19|20)\d{2}\b`, Replacement: "[REDACTED_DOB]", IsEnabled: true},
 		{Name: "EMAIL", Pattern: `[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}`, Replacement: "[REDACTED_EMAIL]", IsEnabled: true},
-		{Name: "PHONE", Pattern: `(?:\+\d{1,3}[\s\-]?)?(?:\(?\d{1,4}\)?[\s\-]?)?\d{2,4}[\s\-]?\d{3,4}[\s\-]?\d{3,4}`, Replacement: "[REDACTED_PHONE]", IsEnabled: true},
+		{Name: "PHONE", Pattern: `\b(?:\+\d{1,3}[\s\-]?)?(?:\(?\d{1,4}\)?[\s\-]?)?\d{2,4}[\s\-]\d{3,4}[\s\-]\d{3,4}\b|\b\+\d{1,3}[\s\-]?\d{6,14}\b|\b0\d{3}[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}\b`, Replacement: "[REDACTED_PHONE]", IsEnabled: true},
 		{Name: "IPV4", Pattern: `\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b`, Replacement: "[REDACTED_IP]", IsEnabled: true},
 		{Name: "MAC_ADDRESS", Pattern: `\b(?:[0-9A-Fa-f]{2}[:\-]){5}[0-9A-Fa-f]{2}\b`, Replacement: "[REDACTED_MAC]", IsEnabled: true},
 		{Name: "US_PASSPORT", Pattern: `\b[A-Z]\d{8}\b`, Replacement: "[REDACTED_PASSPORT]", IsEnabled: true},
