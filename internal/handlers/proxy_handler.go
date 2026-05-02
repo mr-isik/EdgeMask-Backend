@@ -127,8 +127,14 @@ func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
 		}
 	}()
 
-	if ct := respHeaders.Get("Content-Type"); ct != "" {
-		c.Set("Content-Type", ct)
+	for k, vals := range respHeaders {
+		kLower := strings.ToLower(k)
+		if kLower == "connection" || kLower == "transfer-encoding" || kLower == "content-length" || kLower == "keep-alive" {
+			continue
+		}
+		if len(vals) > 0 {
+			c.Set(k, strings.Join(vals, ", "))
+		}
 	}
 	c.Set("Cache-Control", "no-cache")
 	c.Set("X-EdgeMask-Provider", providerStr)
