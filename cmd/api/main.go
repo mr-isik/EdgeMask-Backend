@@ -54,9 +54,6 @@ import (
 
 // @tag.name         Analytics
 // @tag.description  Usage statistics and time-series analytics for the dashboard
-//
-// @tag.name         Billing
-// @tag.description  Dodo Payments checkout and billing integration endpoints
 
 func main() {
 	cfg := config.LoadConfig()
@@ -88,8 +85,6 @@ func main() {
 	keyRepo := pgRepo.NewKeyRepository(db)
 	analyticsRepo := pgRepo.NewAnalyticsRepository(db)
 	requestLogRepo := pgRepo.NewRequestLogRepository(db)
-	userBillingRepo := pgRepo.NewUserBillingRepository(db)
-	webhookEventRepo := pgRepo.NewWebhookEventRepository(db)
 	keyCache := redisRepo.NewKeyCache(redisClient)
 	semanticRepo := pgRepo.NewSemanticCacheRepository(db)
 	semanticRespCache := redisRepo.NewSemanticResponseCache(redisClient)
@@ -99,19 +94,6 @@ func main() {
 	authSvc := services.NewAuthService(keyRepo, keyCache)
 	// Zero-trust: no encryption service needed for provider keys
 	embeddingSvc := services.NewEmbeddingService(cfg.OpenAIBaseURL, cfg.SemanticCacheEmbeddingModel)
-	billingSvc := services.NewBillingService(
-		cfg.DodoPaymentsEnabled,
-		cfg.DodoPaymentsAPIKey,
-		cfg.DodoPaymentsBaseURL,
-		cfg.DodoPaymentsEventName,
-		userBillingRepo,
-	)
-	checkoutSvc := services.NewCheckoutService(
-		cfg.DodoPaymentsAPIKey,
-		cfg.DodoPaymentsBaseURL,
-		userBillingRepo,
-	)
-
 	// ─── LLM Provider Adapters (stateless, zero-trust BYOK) ───
 	openai := providers.NewOpenAIAdapter(cfg.OpenAIBaseURL)
 	anthropic := providers.NewAnthropicAdapter(cfg.AnthropicBaseURL)
@@ -161,23 +143,15 @@ func main() {
 		})
 	})
 
-	// ─── Public Webhooks ───────────────────────────────────────
-	handlers.NewDodoWebhookHandler(
-		app,
-		cfg.DodoWebhookSecret,
-		time.Duration(cfg.DodoWebhookToleranceSeconds)*time.Second,
-		webhookEventRepo,
-	)
-
 	// ─── Routes: /v1/* (Proxy — edgemask_live_ key auth) ──────
 	v1 := app.Group("/v1")
 	v1.Use(handlers.AuthMiddleware(authSvc))
-	handlers.NewProxyHandler(v1, proxySvc, requestLogRepo, billingSvc)
+	handlers.NewProxyHandler(v1, proxySvc, requestLogRepo)
 
 	// ─── Routes: /api/* (Dashboard — Supabase JWT auth) ───────
 	api := app.Group("/api")
 	api.Use(handlers.DashboardMiddleware(cfg.SupabaseURL))
-	handlers.NewDashboardHandler(api, keyRepo, checkoutSvc)
+	handlers.NewDashboardHandler(api, keyRepo)
 	handlers.NewAnalyticsHandler(api, analyticsRepo)
 	handlers.NewLogHandler(api, requestLogRepo)
 

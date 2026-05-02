@@ -42,57 +42,6 @@ definitions:
         example: 1250000
         type: integer
     type: object
-  handlers.CreateCheckoutSessionReq:
-    properties:
-      cancel_url:
-        example: https://app.edgemask.io/billing/cancel
-        type: string
-      customer_email:
-        example: customer@example.com
-        type: string
-      customer_name:
-        example: Jane Doe
-        type: string
-      product_id:
-        example: prod_abc123
-        type: string
-      quantity:
-        example: 1
-        type: integer
-      return_url:
-        example: https://app.edgemask.io/billing/success
-        type: string
-    type: object
-  handlers.CreateCheckoutSessionResp:
-    properties:
-      checkout_url:
-        example: https://checkout.dodopayments.com/session/...
-        type: string
-      provider:
-        example: dodopayments
-        type: string
-      session_id:
-        example: csn_abc123
-        type: string
-    type: object
-  handlers.CreateCustomerPortalSessionReq:
-    properties:
-      return_url:
-        example: https://app.edgemask.io/billing
-        type: string
-      send_email:
-        example: false
-        type: boolean
-    type: object
-  handlers.CreateCustomerPortalSessionResp:
-    properties:
-      portal_url:
-        example: https://customer.dodopayments.com/session/...
-        type: string
-      provider:
-        example: dodopayments
-        type: string
-    type: object
   handlers.CreateKeyReq:
     properties:
       name:
@@ -108,28 +57,6 @@ definitions:
         example: Save this key securely. It will NOT be shown again.
         type: string
     type: object
-  handlers.DodoWebhookReq:
-    properties:
-      business_id:
-        example: biz_123
-        type: string
-      data: {}
-      timestamp:
-        example: "2026-04-09T12:00:00Z"
-        type: string
-      type:
-        example: subscription.active
-        type: string
-    type: object
-  handlers.DodoWebhookResp:
-    properties:
-      duplicate:
-        example: false
-        type: boolean
-      received:
-        example: true
-        type: boolean
-    type: object
   handlers.ErrorResponse:
     properties:
       error:
@@ -141,13 +68,6 @@ definitions:
       keys:
         items:
           $ref: '#/definitions/handlers.APIKeyDoc'
-        type: array
-    type: object
-  handlers.ListProviderKeysResp:
-    properties:
-      providers:
-        items:
-          $ref: '#/definitions/handlers.ProviderKeyDoc'
         type: array
     type: object
   handlers.LogEntryDoc:
@@ -206,18 +126,6 @@ definitions:
         example: user
         type: string
     type: object
-  handlers.ProviderKeyDoc:
-    properties:
-      key_hint:
-        example: sk-...c123
-        type: string
-      provider:
-        example: openai
-        type: string
-      updated_at:
-        example: "2026-04-01T12:00:00Z"
-        type: string
-    type: object
   handlers.ProxyReq:
     properties:
       messages:
@@ -230,31 +138,6 @@ definitions:
       stream:
         example: true
         type: boolean
-    type: object
-  handlers.SaveProviderKeyReq:
-    properties:
-      api_key:
-        example: sk-proj-abc123...
-        type: string
-      provider:
-        enum:
-        - openai
-        - anthropic
-        - gemini
-        example: openai
-        type: string
-    type: object
-  handlers.SaveProviderKeyResp:
-    properties:
-      hint:
-        example: sk-p...c123
-        type: string
-      message:
-        example: provider key saved successfully
-        type: string
-      provider:
-        example: openai
-        type: string
     type: object
   handlers.UsageChartResp:
     properties:
@@ -296,9 +179,10 @@ info:
     email: support@edgemask.io
     name: EdgeMask Support
     url: https://edgemask.io/support
-  description: High-Performance B2B AI Proxy with PII Redaction. EdgeMask intercepts
-    LLM API requests, scrubs PII data, and forwards them to OpenAI, Anthropic, or
-    Gemini using customer-provided API keys (BYOK model).
+  description: 'High-Performance B2B AI Proxy with PII Redaction. Zero-trust BYOK
+    architecture: EdgeMask intercepts LLM API requests, scrubs PII data, and forwards
+    them to OpenAI, Anthropic, or Gemini. Provider API keys are passed per-request
+    via the Authorization header and are never stored.'
   license:
     name: Commercial
     url: https://edgemask.io/license
@@ -306,82 +190,9 @@ info:
   title: EdgeMask API
   version: "1.0"
 paths:
-  /api/billing/checkout-session:
-    post:
-      consumes:
-      - application/json
-      description: Creates a Dodo Payments checkout session and returns redirect URL.
-      parameters:
-      - description: Checkout session request
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.CreateCheckoutSessionReq'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.CreateCheckoutSessionResp'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - SupabaseJWT: []
-      summary: Create Dodo checkout session
-      tags:
-      - Billing
-  /api/billing/customer-portal-session:
-    post:
-      consumes:
-      - application/json
-      description: Creates a dynamic Dodo Payments customer portal link for the authenticated
-        user.
-      parameters:
-      - description: Customer portal request
-        in: body
-        name: body
-        schema:
-          $ref: '#/definitions/handlers.CreateCustomerPortalSessionReq'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.CreateCustomerPortalSessionResp'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - SupabaseJWT: []
-      summary: Create Dodo customer portal session
-      tags:
-      - Billing
   /api/keys:
     get:
-      description: Returns all EdgeMask API keys for the authenticated user. Only
-        prefixes are shown, never full keys or hashes.
+      description: Returns all EdgeMask API keys for the authenticated user.
       produces:
       - application/json
       responses:
@@ -440,8 +251,7 @@ paths:
       - Key Management
   /api/keys/{id}/revoke:
     patch:
-      description: Marks an EdgeMask API key as inactive. Subsequent proxy requests
-        with this key will be rejected.
+      description: Marks an EdgeMask API key as inactive.
       parameters:
       - description: Key ID to revoke
         in: path
@@ -522,140 +332,6 @@ paths:
       summary: List filtered request logs
       tags:
       - Logs
-  /api/providers:
-    get:
-      description: Returns all LLM provider API keys configured for the authenticated
-        user (without revealing the actual secure key strings).
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.ListProviderKeysResp'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - SupabaseJWT: []
-      summary: List configured provider API keys
-      tags:
-      - Provider Keys
-    post:
-      consumes:
-      - application/json
-      description: Encrypts and stores the customer's LLM provider key (OpenAI, Anthropic,
-        or Gemini). Uses AES-256-GCM encryption at rest.
-      parameters:
-      - description: Provider key to save
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.SaveProviderKeyReq'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.SaveProviderKeyResp'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - SupabaseJWT: []
-      summary: Save or update a provider API key
-      tags:
-      - Provider Keys
-    put:
-      consumes:
-      - application/json
-      description: Updates an existing customer's LLM provider key securely.
-      parameters:
-      - description: Provider key to update
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.SaveProviderKeyReq'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.SaveProviderKeyResp'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - SupabaseJWT: []
-      summary: Update a provider API key
-      tags:
-      - Provider Keys
-  /api/providers/{provider}:
-    delete:
-      description: Hard deletes a customer's LLM provider API key from EdgeMask.
-      parameters:
-      - description: Provider ID to delete (openai, anthropic, gemini)
-        in: path
-        name: provider
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      security:
-      - SupabaseJWT: []
-      summary: Delete a provider API key
-      tags:
-      - Provider Keys
   /api/stats:
     get:
       description: Returns total request count, total PII items redacted, and total
@@ -728,9 +404,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Scrubs PII from the request body, then forwards it to the selected
-        LLM provider (openai, anthropic, gemini) using the customer's own API key.
-        Supports streaming (SSE) responses.
+      description: 'Scrubs PII from the request body and forwards the request to the
+        selected LLM provider. Zero-trust bypass: all headers (Authorization, custom
+        headers, etc.) are forwarded as-is — pass your provider API key in Authorization.
+        Only X-EdgeMask-Key is stripped before forwarding.'
       parameters:
       - description: LLM provider
         enum:
@@ -740,6 +417,16 @@ paths:
         in: path
         name: provider
         required: true
+        type: string
+      - description: EdgeMask API key (edgemask_live_...)
+        in: header
+        name: X-EdgeMask-Key
+        required: true
+        type: string
+      - description: Provider API key forwarded directly to upstream (e.g. Bearer
+          sk-...)
+        in: header
+        name: Authorization
         type: string
       - description: OpenAI-compatible chat completion request
         in: body
@@ -772,55 +459,6 @@ paths:
       summary: Proxy request to LLM provider
       tags:
       - Proxy
-  /webhooks/dodo:
-    post:
-      consumes:
-      - application/json
-      description: Verifies Svix signature headers and accepts Dodo webhook events.
-      parameters:
-      - description: Unique webhook delivery ID
-        in: header
-        name: webhook-id
-        required: true
-        type: string
-      - description: Svix signature header
-        in: header
-        name: webhook-signature
-        required: true
-        type: string
-      - description: Webhook timestamp (unix seconds or RFC3339)
-        in: header
-        name: webhook-timestamp
-        required: true
-        type: string
-      - description: Webhook payload
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.DodoWebhookReq'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.DodoWebhookResp'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/handlers.ErrorResponse'
-      summary: Dodo Payments webhook receiver
-      tags:
-      - Billing
 securityDefinitions:
   EdgeMaskAPIKey:
     description: 'EdgeMask API Key. Format: `Bearer edgemask_live_...`'
@@ -835,12 +473,9 @@ securityDefinitions:
 swagger: "2.0"
 tags:
 - description: AI Proxy endpoints — forward requests to LLM providers with PII redaction
+    (zero-trust BYOK)
   name: Proxy
 - description: Manage EdgeMask API keys (edgemask_live_...)
   name: Key Management
-- description: Manage customer-owned LLM provider API keys (BYOK)
-  name: Provider Keys
 - description: Usage statistics and time-series analytics for the dashboard
   name: Analytics
-- description: Dodo Payments checkout and billing integration endpoints
-  name: Billing

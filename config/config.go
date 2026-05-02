@@ -41,13 +41,7 @@ type Config struct {
 	SemanticCacheSimilarityMinimum float64
 	SemanticCacheEmbeddingModel    string
 
-	// Dodo Payments usage-based billing
-	DodoPaymentsEnabled         bool
-	DodoPaymentsAPIKey          string
-	DodoPaymentsBaseURL         string
-	DodoPaymentsEventName       string
-	DodoWebhookSecret           string
-	DodoWebhookToleranceSeconds int
+
 }
 
 // LoadConfig reads configuration from environment variables.
@@ -78,12 +72,6 @@ func LoadConfig() *Config {
 		SemanticCacheSimilarityMinimum: getEnvFloat("SEMANTIC_CACHE_SIMILARITY_MIN", 0.92),
 		SemanticCacheEmbeddingModel:    getEnv("SEMANTIC_CACHE_EMBEDDING_MODEL", "text-embedding-3-small"),
 
-		DodoPaymentsEnabled:         getEnvBool("DODO_PAYMENTS_ENABLED", false),
-		DodoPaymentsAPIKey:          getEnv("DODO_PAYMENTS_API_KEY", ""),
-		DodoPaymentsBaseURL:         getEnv("DODO_PAYMENTS_BASE_URL", "https://test.dodopayments.com"),
-		DodoPaymentsEventName:       getEnv("DODO_PAYMENTS_EVENT_NAME", "api.tokens.used"),
-		DodoWebhookSecret:           getEnv("DODO_PAYMENTS_WEBHOOK_SECRET", ""),
-		DodoWebhookToleranceSeconds: getEnvInt("DODO_PAYMENTS_WEBHOOK_TOLERANCE_SECONDS", 300),
 	}
 }
 

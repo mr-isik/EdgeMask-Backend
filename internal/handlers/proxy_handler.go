@@ -17,7 +17,6 @@ import (
 type ProxyHandler struct {
 	proxyService   domain.ProxyService
 	requestLogRepo domain.RequestLogRepository
-	billingService domain.BillingService
 }
 
 // NewProxyHandler creates a new ProxyHandler and registers routes.
@@ -25,12 +24,10 @@ func NewProxyHandler(
 	app fiber.Router,
 	proxyService domain.ProxyService,
 	requestLogRepo domain.RequestLogRepository,
-	billingService domain.BillingService,
 ) {
 	h := &ProxyHandler{
 		proxyService:   proxyService,
 		requestLogRepo: requestLogRepo,
-		billingService: billingService,
 	}
 
 	app.Post("/proxy/:provider", h.HandleProxy)
@@ -127,21 +124,6 @@ func (h *ProxyHandler) HandleProxy(c *fiber.Ctx) error {
 		}
 		if insertErr := h.requestLogRepo.InsertLog(context.Background(), logEntry); insertErr != nil {
 			logger.Error("Failed to insert request log: ", insertErr)
-		}
-
-		if h.billingService != nil {
-			billingErr := h.billingService.RecordUsage(context.Background(), domain.UsageEvent{
-				UserID:           userID,
-				Provider:         providerStr,
-				Model:            modelUsed,
-				TokensProcessed:  fwdResult.TokensProcessed,
-				StatusCode:       fwdResult.StatusCode,
-				LatencyMs:        latencyMs,
-				SemanticCacheHit: fwdResult.SemanticCacheHit,
-			})
-			if billingErr != nil {
-				logger.Error("Failed to ingest usage event for billing: ", billingErr)
-			}
 		}
 	}()
 

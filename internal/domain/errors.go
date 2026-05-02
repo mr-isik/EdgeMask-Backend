@@ -13,5 +13,5 @@ var (
 
 	ErrEncryption             = errors.New("encryption error")
 	ErrDecryption             = errors.New("decryption error")
-	ErrBillingMappingNotFound = errors.New("billing customer mapping not found")
+
 )

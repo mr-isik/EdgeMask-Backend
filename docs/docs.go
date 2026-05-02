@@ -24,119 +24,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/billing/checkout-session": {
-            "post": {
-                "security": [
-                    {
-                        "SupabaseJWT": []
-                    }
-                ],
-                "description": "Creates a Dodo Payments checkout session and returns redirect URL.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Billing"
-                ],
-                "summary": "Create Dodo checkout session",
-                "parameters": [
-                    {
-                        "description": "Checkout session request",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateCheckoutSessionReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateCheckoutSessionResp"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/billing/customer-portal-session": {
-            "post": {
-                "security": [
-                    {
-                        "SupabaseJWT": []
-                    }
-                ],
-                "description": "Creates a dynamic Dodo Payments customer portal link for the authenticated user.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Billing"
-                ],
-                "summary": "Create Dodo customer portal session",
-                "parameters": [
-                    {
-                        "description": "Customer portal request",
-                        "name": "body",
-                        "in": "body",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateCustomerPortalSessionReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateCustomerPortalSessionResp"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/keys": {
             "get": {
                 "security": [
@@ -144,7 +31,7 @@ const docTemplate = `{
                         "SupabaseJWT": []
                     }
                 ],
-                "description": "Returns all EdgeMask API keys for the authenticated user. Only prefixes are shown, never full keys or hashes.",
+                "description": "Returns all EdgeMask API keys for the authenticated user.",
                 "produces": [
                     "application/json"
                 ],
@@ -236,7 +123,7 @@ const docTemplate = `{
                         "SupabaseJWT": []
                     }
                 ],
-                "description": "Marks an EdgeMask API key as inactive. Subsequent proxy requests with this key will be rejected.",
+                "description": "Marks an EdgeMask API key as inactive.",
                 "produces": [
                     "application/json"
                 ],
@@ -340,214 +227,6 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/providers": {
-            "get": {
-                "security": [
-                    {
-                        "SupabaseJWT": []
-                    }
-                ],
-                "description": "Returns all LLM provider API keys configured for the authenticated user (without revealing the actual secure key strings).",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Provider Keys"
-                ],
-                "summary": "List configured provider API keys",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ListProviderKeysResp"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "SupabaseJWT": []
-                    }
-                ],
-                "description": "Updates an existing customer's LLM provider key securely.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Provider Keys"
-                ],
-                "summary": "Update a provider API key",
-                "parameters": [
-                    {
-                        "description": "Provider key to update",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.SaveProviderKeyReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.SaveProviderKeyResp"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "SupabaseJWT": []
-                    }
-                ],
-                "description": "Encrypts and stores the customer's LLM provider key (OpenAI, Anthropic, or Gemini). Uses AES-256-GCM encryption at rest.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Provider Keys"
-                ],
-                "summary": "Save or update a provider API key",
-                "parameters": [
-                    {
-                        "description": "Provider key to save",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.SaveProviderKeyReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.SaveProviderKeyResp"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/providers/{provider}": {
-            "delete": {
-                "security": [
-                    {
-                        "SupabaseJWT": []
-                    }
-                ],
-                "description": "Hard deletes a customer's LLM provider API key from EdgeMask.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Provider Keys"
-                ],
-                "summary": "Delete a provider API key",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Provider ID to delete (openai, anthropic, gemini)",
-                        "name": "provider",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -670,7 +349,7 @@ const docTemplate = `{
                         "EdgeMaskAPIKey": []
                     }
                 ],
-                "description": "Scrubs PII from the request body, then forwards it to the selected LLM provider (openai, anthropic, gemini) using the customer's own API key. Supports streaming (SSE) responses.",
+                "description": "Scrubs PII from the request body and forwards the request to the selected LLM provider. Zero-trust bypass: all headers (Authorization, custom headers, etc.) are forwarded as-is — pass your provider API key in Authorization. Only X-EdgeMask-Key is stripped before forwarding.",
                 "consumes": [
                     "application/json"
                 ],
@@ -694,6 +373,19 @@ const docTemplate = `{
                         "name": "provider",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "EdgeMask API key (edgemask_live_...)",
+                        "name": "X-EdgeMask-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Provider API key forwarded directly to upstream (e.g. Bearer sk-...)",
+                        "name": "Authorization",
+                        "in": "header"
                     },
                     {
                         "description": "OpenAI-compatible chat completion request",
@@ -726,79 +418,6 @@ const docTemplate = `{
                     },
                     "502": {
                         "description": "Bad Gateway",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/webhooks/dodo": {
-            "post": {
-                "description": "Verifies Svix signature headers and accepts Dodo webhook events.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Billing"
-                ],
-                "summary": "Dodo Payments webhook receiver",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Unique webhook delivery ID",
-                        "name": "webhook-id",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Svix signature header",
-                        "name": "webhook-signature",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Webhook timestamp (unix seconds or RFC3339)",
-                        "name": "webhook-timestamp",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "description": "Webhook payload",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.DodoWebhookReq"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.DodoWebhookResp"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/handlers.ErrorResponse"
                         }
@@ -866,78 +485,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.CreateCheckoutSessionReq": {
-            "type": "object",
-            "properties": {
-                "cancel_url": {
-                    "type": "string",
-                    "example": "https://app.edgemask.io/billing/cancel"
-                },
-                "customer_email": {
-                    "type": "string",
-                    "example": "customer@example.com"
-                },
-                "customer_name": {
-                    "type": "string",
-                    "example": "Jane Doe"
-                },
-                "product_id": {
-                    "type": "string",
-                    "example": "prod_abc123"
-                },
-                "quantity": {
-                    "type": "integer",
-                    "example": 1
-                },
-                "return_url": {
-                    "type": "string",
-                    "example": "https://app.edgemask.io/billing/success"
-                }
-            }
-        },
-        "handlers.CreateCheckoutSessionResp": {
-            "type": "object",
-            "properties": {
-                "checkout_url": {
-                    "type": "string",
-                    "example": "https://checkout.dodopayments.com/session/..."
-                },
-                "provider": {
-                    "type": "string",
-                    "example": "dodopayments"
-                },
-                "session_id": {
-                    "type": "string",
-                    "example": "csn_abc123"
-                }
-            }
-        },
-        "handlers.CreateCustomerPortalSessionReq": {
-            "type": "object",
-            "properties": {
-                "return_url": {
-                    "type": "string",
-                    "example": "https://app.edgemask.io/billing"
-                },
-                "send_email": {
-                    "type": "boolean",
-                    "example": false
-                }
-            }
-        },
-        "handlers.CreateCustomerPortalSessionResp": {
-            "type": "object",
-            "properties": {
-                "portal_url": {
-                    "type": "string",
-                    "example": "https://customer.dodopayments.com/session/..."
-                },
-                "provider": {
-                    "type": "string",
-                    "example": "dodopayments"
-                }
-            }
-        },
         "handlers.CreateKeyReq": {
             "type": "object",
             "properties": {
@@ -960,37 +507,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.DodoWebhookReq": {
-            "type": "object",
-            "properties": {
-                "business_id": {
-                    "type": "string",
-                    "example": "biz_123"
-                },
-                "data": {},
-                "timestamp": {
-                    "type": "string",
-                    "example": "2026-04-09T12:00:00Z"
-                },
-                "type": {
-                    "type": "string",
-                    "example": "subscription.active"
-                }
-            }
-        },
-        "handlers.DodoWebhookResp": {
-            "type": "object",
-            "properties": {
-                "duplicate": {
-                    "type": "boolean",
-                    "example": false
-                },
-                "received": {
-                    "type": "boolean",
-                    "example": true
-                }
-            }
-        },
         "handlers.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -1007,17 +523,6 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/handlers.APIKeyDoc"
-                    }
-                }
-            }
-        },
-        "handlers.ListProviderKeysResp": {
-            "type": "object",
-            "properties": {
-                "providers": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handlers.ProviderKeyDoc"
                     }
                 }
             }
@@ -1101,23 +606,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.ProviderKeyDoc": {
-            "type": "object",
-            "properties": {
-                "key_hint": {
-                    "type": "string",
-                    "example": "sk-...c123"
-                },
-                "provider": {
-                    "type": "string",
-                    "example": "openai"
-                },
-                "updated_at": {
-                    "type": "string",
-                    "example": "2026-04-01T12:00:00Z"
-                }
-            }
-        },
         "handlers.ProxyReq": {
             "type": "object",
             "properties": {
@@ -1134,41 +622,6 @@ const docTemplate = `{
                 "stream": {
                     "type": "boolean",
                     "example": true
-                }
-            }
-        },
-        "handlers.SaveProviderKeyReq": {
-            "type": "object",
-            "properties": {
-                "api_key": {
-                    "type": "string",
-                    "example": "sk-proj-abc123..."
-                },
-                "provider": {
-                    "type": "string",
-                    "enum": [
-                        "openai",
-                        "anthropic",
-                        "gemini"
-                    ],
-                    "example": "openai"
-                }
-            }
-        },
-        "handlers.SaveProviderKeyResp": {
-            "type": "object",
-            "properties": {
-                "hint": {
-                    "type": "string",
-                    "example": "sk-p...c123"
-                },
-                "message": {
-                    "type": "string",
-                    "example": "provider key saved successfully"
-                },
-                "provider": {
-                    "type": "string",
-                    "example": "openai"
                 }
             }
         },
@@ -1237,7 +690,7 @@ const docTemplate = `{
     },
     "tags": [
         {
-            "description": "AI Proxy endpoints — forward requests to LLM providers with PII redaction",
+            "description": "AI Proxy endpoints — forward requests to LLM providers with PII redaction (zero-trust BYOK)",
             "name": "Proxy"
         },
         {
@@ -1245,16 +698,8 @@ const docTemplate = `{
             "name": "Key Management"
         },
         {
-            "description": "Manage customer-owned LLM provider API keys (BYOK)",
-            "name": "Provider Keys"
-        },
-        {
             "description": "Usage statistics and time-series analytics for the dashboard",
             "name": "Analytics"
-        },
-        {
-            "description": "Dodo Payments checkout and billing integration endpoints",
-            "name": "Billing"
         }
     ]
 }`
@@ -1266,7 +711,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "EdgeMask API",
-	Description:      "High-Performance B2B AI Proxy with PII Redaction. EdgeMask intercepts LLM API requests, scrubs PII data, and forwards them to OpenAI, Anthropic, or Gemini using customer-provided API keys (BYOK model).",
+	Description:      "High-Performance B2B AI Proxy with PII Redaction. Zero-trust BYOK architecture: EdgeMask intercepts LLM API requests, scrubs PII data, and forwards them to OpenAI, Anthropic, or Gemini. Provider API keys are passed per-request via the Authorization header and are never stored.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",
