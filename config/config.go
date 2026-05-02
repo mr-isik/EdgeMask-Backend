@@ -17,9 +17,8 @@ type Config struct {
 	// Database (Supabase PostgreSQL via Pooler)
 	DatabaseURL string
 
-	// Redis
-	RedisURL      string
-	RedisPassword string
+	// Redis — full connection URL, e.g. redis://:password@host:6379/0 or rediss://user:pass@host:6380/0
+	RedisURL string
 
 	// Security
 	APIKeySecret string // Used for HMAC hashing of EdgeMask API keys
@@ -54,8 +53,7 @@ func LoadConfig() *Config {
 		Port:          getEnv("PORT", "3000"),
 		AppEnv:        getEnv("APP_ENV", "development"),
 		DatabaseURL:   getEnv("DATABASE_URL", ""),
-		RedisURL:      getEnv("REDIS_URL", "localhost:6379"),
-		RedisPassword: getEnv("REDIS_PASSWORD", ""),
+		RedisURL: getEnv("REDIS_URL", "redis://localhost:6379/0"),
 		APIKeySecret:  getEnv("API_KEY_SECRET", ""),
 
 		SupabaseURL:            getEnv("SUPABASE_URL", ""),

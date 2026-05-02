@@ -74,11 +74,14 @@ func main() {
 	}
 
 	// ─── Redis ─────────────────────────────────────────────────
-	redisClient := goredis.NewClient(&goredis.Options{
-		Addr:     cfg.RedisURL,
-		Password: cfg.RedisPassword,
-		DB:       0,
-	})
+	// REDIS_URL format: redis://:password@host:6379/0
+	//                or rediss://user:password@host:6380/0  (TLS)
+	redisOpts, err := goredis.ParseURL(cfg.RedisURL)
+	if err != nil {
+		logger.Error("Invalid REDIS_URL: ", err)
+		panic(err)
+	}
+	redisClient := goredis.NewClient(redisOpts)
 	defer redisClient.Close()
 
 	// ─── Repositories ──────────────────────────────────────────
